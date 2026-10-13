@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Store y caché de pnpm dentro del proyecto (.tools/ está en .gitignore).
+storeDir: .tools/.cache/pnpm-store
+cacheDir: .tools/.cache/pnpm
+
+# Solo versiones publicadas hace al menos 7 días: margen ante paquetes comprometidos recién publicados.
+minimumReleaseAge: 10080
