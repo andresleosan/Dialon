@@ -130,48 +130,13 @@ function ConversationHalf({
       ]}
     >
       {/* Cuerpo desplazable propio: con letra ampliada todo lo informativo se lee entero haciendo scroll. */}
-      <ScrollView testID={`cuerpo-${participant}`} style={styles.body} contentContainerStyle={styles.bodyContent}>
-        <View style={[styles.banner, { backgroundColor: theme.avisoFondo }]}>
-          <Text style={[styles.bannerText, { color: theme.avisoTexto }]}>{copy.demoBanner}</Text>
-          <Text style={[styles.noAudioText, { color: theme.avisoTexto }]}>{copy.noAudio}</Text>
-        </View>
-
-        <View style={styles.header}>
-          <View role="radiogroup" aria-label={copy.languageGroup} style={styles.languages}>
-            {UI_LANGUAGES.map((option) => {
-              const selected = option === language;
-              return (
-                <Pressable
-                  key={option}
-                  role="radio"
-                  aria-checked={selected}
-                  disabled={languagesLocked}
-                  onPress={() => {
-                    onSelectLanguage(option);
-                  }}
-                  style={[
-                    styles.option,
-                    selected
-                      ? { backgroundColor: theme.acento, borderColor: theme.acento }
-                      : { borderColor: theme.contorno },
-                  ]}
-                >
-                  <Text style={[styles.optionText, { color: selected ? theme.sobreAcento : theme.texto }]}>
-                    {COPY[option].languageName}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.statusRow}>
-            <Text aria-hidden style={[styles.status, { color: theme.texto2 }]}>
-              {STATUS_ICON[view.status]}
-            </Text>
-            <Text style={[styles.status, styles.shrink, { color: theme.texto2 }]}>{copy.status[view.status]}</Text>
-          </View>
-        </View>
-
-        <View style={styles.reading}>
+      <ScrollView
+        testID={`cuerpo-${participant}`}
+        style={styles.body}
+        contentContainerStyle={[styles.column, styles.bodyContent]}
+      >
+        {/* Tarjeta de lectura: la traducción recibida es lo más grande de la mitad y ocupa el hueco libre. */}
+        <View style={[styles.reading, { backgroundColor: theme.fondo, borderColor: theme.separador }]}>
           {view.received !== undefined && (
             <Text aria-live="polite" style={[styles.received, { color: theme.texto }]}>
               {view.received}
@@ -195,10 +160,66 @@ function ConversationHalf({
             </Text>
           </View>
         )}
+
+        {/* Nota DEMO subordinada: sus dos líneas siempre enteras, con barra lateral de aviso. */}
+        <View style={[styles.demo, { borderLeftColor: theme.avisoBorde }]}>
+          <Text style={[styles.demoText, styles.demoTitle, { color: theme.avisoTexto }]}>{copy.demoBanner}</Text>
+          <Text style={[styles.demoText, { color: theme.texto2 }]}>{copy.noAudio}</Text>
+        </View>
+
+        {/* Idioma y estado junto a las acciones. El idioma elegido es tonal con ✓: nunca el azul del botón. */}
+        <View style={styles.controls}>
+          <View
+            role="radiogroup"
+            aria-label={copy.languageGroup}
+            style={[styles.segments, { backgroundColor: theme.fondo, borderColor: theme.contorno }]}
+          >
+            {UI_LANGUAGES.map((option, index) => {
+              const selected = option === language;
+              const name = COPY[option].languageName;
+              const color = selected ? theme.sobreSeleccion : languagesLocked ? theme.texto2 : theme.texto;
+              return (
+                <Pressable
+                  key={option}
+                  role="radio"
+                  aria-label={name}
+                  aria-checked={selected}
+                  disabled={languagesLocked}
+                  onPress={() => {
+                    onSelectLanguage(option);
+                  }}
+                  style={[
+                    styles.segment,
+                    { outlineColor: theme.acento },
+                    index === 0 ? styles.segmentFirst : [styles.segmentNext, { borderLeftColor: theme.contorno }],
+                    index === UI_LANGUAGES.length - 1 && styles.segmentLast,
+                    selected && { backgroundColor: theme.seleccion },
+                  ]}
+                >
+                  {selected && (
+                    <Text aria-hidden style={[styles.segmentText, styles.segmentSelected, { color }]}>
+                      ✓
+                    </Text>
+                  )}
+                  <Text style={[styles.segmentText, selected && styles.segmentSelected, { color }]}>{name}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.statusRow}>
+            <Text
+              aria-hidden
+              style={[styles.status, { color: view.status === "listening" ? theme.grabando : theme.texto2 }]}
+            >
+              {STATUS_ICON[view.status]}
+            </Text>
+            <Text style={[styles.status, styles.shrink, { color: theme.texto2 }]}>{copy.status[view.status]}</Text>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Acciones ancladas fuera del cuerpo: siempre visibles y tocables, aunque el cuerpo esté desplazado. */}
-      <View style={styles.actions}>
+      <View style={[styles.column, styles.actions]}>
         <Pressable
           role="button"
           aria-label={named(copy.button[view.button])}
@@ -206,7 +227,7 @@ function ConversationHalf({
           onPress={onPress}
           style={({ pressed }) => [
             styles.primary,
-            { backgroundColor: buttonColors.background, borderColor: buttonColors.border },
+            { backgroundColor: buttonColors.background, borderColor: buttonColors.border, outlineColor: theme.acento },
             pressed && styles.pressed,
           ]}
         >
@@ -218,7 +239,11 @@ function ConversationHalf({
             role="button"
             aria-label={named(copy.cancel)}
             onPress={onCancel}
-            style={({ pressed }) => [styles.secondary, { borderColor: theme.contorno }, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.secondary,
+              { backgroundColor: theme.fondo, borderColor: theme.contorno, outlineColor: theme.acento },
+              pressed && styles.pressed,
+            ]}
           >
             <Text style={[styles.secondaryText, { color: theme.texto }]}>{copy.cancel}</Text>
           </Pressable>
@@ -279,17 +304,34 @@ const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: "column-reverse" },
   half: { flex: 1 },
   rotated: { transform: [{ rotate: "180deg" }] },
-  // El cuerpo ocupa lo que dejan las acciones y desplaza su contenido; el relleno vertical compacto mantiene la
-  // traducción de 2 líneas entera sin scroll a 360×640 con letra normal.
+  // Cuerpo y acciones comparten columna: todo el ancho en el teléfono y 760 px centrados en escritorio. Solo
+  // cambia el ancho; cada mitad sigue midiendo la mitad del alto.
+  column: { width: "100%", maxWidth: 760, alignSelf: "center" },
+  // El cuerpo ocupa lo que dejan las acciones y desplaza su contenido. Si sobra alto, la tarjeta de lectura lo
+  // llena y deja la nota DEMO y el idioma junto a las acciones.
   body: { flex: 1 },
-  bodyContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 8 },
-  banner: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4 },
-  bannerText: { fontSize: 16, lineHeight: 24, fontWeight: "500" },
-  noAudioText: { fontSize: 16, lineHeight: 24 },
-  header: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  languages: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  option: { minHeight: 48, minWidth: 48, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, justifyContent: "center" },
-  optionText: { fontSize: 16, lineHeight: 24, fontWeight: "500" },
+  bodyContent: { flexGrow: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 8 },
+  reading: { flexGrow: 1, gap: 8, borderRadius: 16, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 12 },
+  demo: { borderLeftWidth: 4, paddingLeft: 12, paddingVertical: 4 },
+  demoText: { fontSize: 14, lineHeight: 20 },
+  demoTitle: { fontWeight: "600" },
+  controls: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  // Selector segmentado: si con letra grande no cabe en una fila, sus opciones bajan a otra sin recortarse.
+  segments: { flexDirection: "row", flexWrap: "wrap", flexShrink: 1, borderRadius: 12, borderWidth: 1 },
+  segment: {
+    minHeight: 48,
+    minWidth: 48,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  segmentFirst: { borderTopLeftRadius: 11, borderBottomLeftRadius: 11 },
+  segmentNext: { borderLeftWidth: 1 },
+  segmentLast: { borderTopRightRadius: 11, borderBottomRightRadius: 11 },
+  segmentText: { fontSize: 16, lineHeight: 24, fontWeight: "500" },
+  segmentSelected: { fontWeight: "700" },
   // El estado ocupa el hueco junto al selector y parte su texto; si quedan menos de 120 px (letra grande),
   // baja a otra fila en vez de solaparse con el selector.
   statusRow: {
@@ -302,7 +344,6 @@ const styles = StyleSheet.create({
   },
   shrink: { flexShrink: 1 },
   status: { fontSize: 16, lineHeight: 24, fontWeight: "500" },
-  reading: { gap: 8 },
   received: { fontSize: 28, lineHeight: 36 },
   said: { fontSize: 16, lineHeight: 24 },
   notice: { flexDirection: "row", gap: 8, borderRadius: 12, padding: 12 },
@@ -312,16 +353,16 @@ const styles = StyleSheet.create({
   // fila a todo el ancho, sin reducir ni ocultar textos.
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
   primary: {
-    flexGrow: 1,
+    flexGrow: 3,
     flexBasis: 200,
     minHeight: 64,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryText: { fontSize: 18, lineHeight: 24, fontWeight: "500", textAlign: "center" },
+  primaryText: { fontSize: 18, lineHeight: 24, fontWeight: "600", textAlign: "center" },
   secondary: {
     flexGrow: 1,
     minHeight: 48,
@@ -331,6 +372,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  secondaryText: { fontSize: 16, lineHeight: 24, fontWeight: "500" },
+  secondaryText: { fontSize: 18, lineHeight: 24, fontWeight: "600" },
   pressed: { opacity: 0.85 },
 });

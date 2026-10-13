@@ -11,8 +11,12 @@ const light = {
   grabando: "#B42318",
   sobreGrabando: "#FFFFFF",
   contorno: "#6B7079",
+  separador: "#D5D9DF",
+  seleccion: "#D8E4FA",
+  sobreSeleccion: "#0F3A80",
   avisoFondo: "#FFF4D6",
   avisoTexto: "#5C4400",
+  avisoBorde: "#A67A00",
 };
 
 export type Theme = typeof light;
@@ -27,8 +31,12 @@ const dark: Theme = {
   grabando: "#F2B8B5",
   sobreGrabando: "#410E0B",
   contorno: "#8C929C",
+  separador: "#2E333A",
+  seleccion: "#23395D",
+  sobreSeleccion: "#D6E3FF",
   avisoFondo: "#3A2E00",
   avisoTexto: "#FFE08A",
+  avisoBorde: "#E0B341",
 };
 
 /** Tema claro u oscuro según el sistema. */
