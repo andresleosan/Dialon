@@ -1,14 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react-native";
-import {
-  AccessibilityInfo,
-  Dimensions,
-  Platform,
-  StyleSheet,
-  TextInput,
-  useColorScheme,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
+import { AccessibilityInfo, Dimensions, Platform, TextInput, useColorScheme } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import type { LocalAudio } from "../audio/capture";
 import { webAudioCapture } from "../audio/webCapture";
@@ -979,33 +970,62 @@ describe("FaceToFaceScreen en web: audio local real", () => {
     expect(halfA.getByText("Muy corto. Toca, habla y vuelve a tocar.")).toBeOnTheScreen();
     expect(screen.queryByText("Tu audio")).toBeNull();
   });
-  it("mientras A graba, solo su mitad muestra barras con la intensidad real; el silencio queda plano y al cancelar desaparecen", async () => {
+  it("mientras A graba, solo su mitad muestra la onda con la intensidad real: plana en silencio y fuera al cancelar", async () => {
+    jest.replaceProperty(Platform, "OS", "web");
     const browser = installBrowser();
     const { halfA, halfB } = await renderScreen(uuidSequence(), WEB_AUDIO);
     await fireEvent.press(halfA.getByRole("button", { name: A.start }));
     await browser.grant();
-    const bars = () =>
-      screen
-        .queryAllByTestId("barra-A", { includeHiddenElements: true })
-        .map((bar) => Number(StyleSheet.flatten(bar.props.style as StyleProp<ViewStyle>).height));
+    const wave = (participant: "A" | "B") => screen.queryAllByTestId(`onda-${participant}`, { includeHiddenElements: true });
+    /** Alturas distintas que dibujan los trazos de la onda de A: una sola es una línea plana. */
+    const heightsA = () => {
+      const ys = new Set<string>();
+      for (const node of wave("A")[0]?.queryAll((child) => child.type === "path") ?? []) {
+        const numbers = String((node.props as { d?: unknown }).d).match(/-?\d+(\.\d+)?/g) ?? [];
+        numbers.forEach((value, index) => {
+          if (index % 2 === 1) ys.add(value);
+        });
+      }
+      return ys.size;
+    };
 
-    expect(bars()).toEqual([]);
+    // Sin ninguna medición todavía no se dibuja nada.
+    expect(wave("A")).toHaveLength(0);
     await browser.sound(0);
-    await browser.sound(0);
+    expect(wave("A")).toHaveLength(1);
+    expect(heightsA()).toBe(1);
+    // La onda sube animada: un cuadro más con la misma voz medida.
     await browser.sound(0.3);
-    const [quiet, silent, loud] = bars();
-    expect(bars()).toHaveLength(3);
-    expect(quiet).toBe(silent);
-    expect(loud).toBeGreaterThan(quiet ?? Infinity);
-    expect(screen.queryAllByTestId("barra-B", { includeHiddenElements: true })).toHaveLength(0);
-    // Las barras son decorativas: el estado legible sigue siendo el texto.
-    expect(screen.queryByTestId("medidor-A")).toBeNull();
+    await browser.sound(0.3);
+    expect(heightsA()).toBeGreaterThan(1);
+    expect(wave("B")).toHaveLength(0);
+    // La onda es decorativa: el estado legible sigue siendo el texto.
+    expect(screen.queryByTestId("onda-A")).toBeNull();
     expect(halfA.getByText("Grabando")).toBeOnTheScreen();
     expect(halfB.getByRole("button", { name: B.wait })).toBeDisabled();
 
     await fireEvent.press(halfA.getByRole("button", { name: A.cancel }));
-    expect(bars()).toEqual([]);
+    expect(wave("A")).toHaveLength(0);
     await browser.sound(0.5);
-    expect(bars()).toEqual([]);
+    expect(wave("A")).toHaveLength(0);
+  });
+
+  it("sin Web Audio no hay onda inventada y la grabación y la reproducción siguen; al reproducir no hay onda", async () => {
+    const browser = installBrowser();
+    Reflect.deleteProperty(globalThis, "AudioContext");
+    const { halfA } = await renderScreen(uuidSequence(), WEB_AUDIO);
+    await fireEvent.press(halfA.getByRole("button", { name: A.start }));
+    await browser.grant();
+    await browser.sound(0.4);
+    expect(screen.queryAllByTestId("onda-A", { includeHiddenElements: true })).toHaveLength(0);
+    expect(halfA.getByText("Grabando")).toBeOnTheScreen();
+    await speakFor(1200);
+    await fireEvent.press(halfA.getByRole("button", { name: "Grabando: toca para terminar, Español" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await fireEvent.press(halfA.getByRole("button", { name: "Escuchar, Español" }));
+    expect(halfA.getByRole("button", { name: "Detener, Español" })).toBeEnabled();
+    expect(screen.queryAllByTestId("onda-A", { includeHiddenElements: true })).toHaveLength(0);
   });
 });

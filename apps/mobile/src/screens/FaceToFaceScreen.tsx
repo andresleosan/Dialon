@@ -29,6 +29,7 @@ import { BrandBars, Icon, MicGlyph } from "../icons";
 import { COLORS, panelOf } from "../theme";
 import { useDemoConversation, type LocalClip, type Playback } from "../useDemoConversation";
 import { LanguagePicker, type Rect } from "./LanguagePicker";
+import { VoiceWave } from "./VoiceWave";
 
 export interface FaceToFaceScreenProps {
   /** Genera un UUID v4 por turno (en la app, `randomUUID` de expo-crypto). */
@@ -110,7 +111,7 @@ interface Sizes {
   readonly micIcon: number;
   readonly label: number;
   readonly labelGap: number;
-  /** Alto de las barras de intensidad mientras se graba. */
+  /** Alto de la onda de voz mientras se graba. */
   readonly meter: number;
 }
 
@@ -207,14 +208,6 @@ const SIZES: Readonly<Record<Layout, Sizes>> = {
     labelGap: 4,
   },
 };
-
-/**
- * Alto de una barra a partir del RMS medido (0..1). La voz normal ronda RMS 0,02–0,2, así que una escala de raíz
- * la hace visible sin inventar nada: el silencio queda en una línea plana de 2 px y más intensidad, más alto.
- */
-function barHeight(level: number, max: number): number {
-  return Math.max(2, Math.round(max * Math.min(1, Math.sqrt(level) * 1.6)));
-}
 
 interface HalfView {
   readonly status: StatusKey;
@@ -582,16 +575,13 @@ function ConversationHalf({
               )}
             </>
           ) : levels !== undefined ? (
-            // Barras decorativas con la intensidad medida; el estado legible es el texto «Grabando».
-            <View aria-hidden testID={`medidor-${participant}`} style={[styles.meter, { height: size.meter }]}>
-              {levels.map((level, index) => (
-                <View
-                  // Historia de longitud fija que se desplaza: el índice identifica la posición de cada barra.
-                  key={index}
-                  testID={`barra-${participant}`}
-                  style={[styles.bar, { height: barHeight(level, size.meter), backgroundColor: panel.texto }]}
-                />
-              ))}
+            // Onda decorativa con la intensidad medida; el estado legible es el texto «Grabando».
+            <View aria-hidden testID={`onda-${participant}`} style={{ height: size.meter }}>
+              <VoiceWave
+                level={levels.at(-1) ?? 0}
+                height={size.meter}
+                colors={{ primary: panel.texto, secondary: panel.ceja, tertiary: panel.nota }}
+              />
             </View>
           ) : reading !== undefined ? (
             <>
@@ -937,8 +927,6 @@ const styles = StyleSheet.create({
   cancelText: { fontSize: 14, lineHeight: 18, fontWeight: "600" },
   clipButton: { alignSelf: "flex-start", marginTop: 14 },
   clipFailed: { marginTop: 8 },
-  meter: { flexDirection: "row", alignItems: "center", gap: 3, overflow: "hidden" },
-  bar: { width: 4, borderRadius: 2 },
   speak: { alignItems: "center", borderRadius: 12 },
   ring: { position: "absolute", top: -7, left: -7 },
   circle: { flex: 1, borderWidth: 2, alignItems: "center", justifyContent: "center" },

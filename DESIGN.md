@@ -156,7 +156,11 @@ Aparecen en la mitad que indica la máquina de estados, con «!» y texto, y des
 - Foco de teclado visible: anillo del navegador coloreado con el texto de cada superficie (blanco sobre el panel
   marino; marino sobre el panel blanco, el fondo y el selector); el buscador marca el foco con un borde marino de 2 px.
 - Botones deshabilitados con explicación: «Espera: habla la otra persona», «Hablar no disponible» + texto del motivo.
-- Sin animaciones. Orientación vertical en el teléfono.
+- Sin animaciones, salvo la onda de voz aprobada (web): mientras alguien graba, su mitad muestra curvas suaves
+  superpuestas cuya amplitud sigue la intensidad real (RMS) del micrófono; en silencio queda una línea plana y quieta.
+  Trazo principal con el color del texto del panel y secundarios con `ceja`/`nota` (≥4,5:1). Con
+  `prefers-reduced-motion` muestra la intensidad medida sin animar. Es decorativa: el estado legible es «Grabando».
+  Orientación vertical en el teléfono.
 - Pendiente con dispositivo: TalkBack (orden, foco al cerrar el selector), teclado nativo con el selector abierto
   (sobre todo el de B, girado) y toques en la mitad girada en Android.
 
