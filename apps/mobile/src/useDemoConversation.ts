@@ -7,7 +7,7 @@ import {
   type Turn,
 } from "@dialon/core";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { isUiLanguage, type UiLanguage } from "./copy";
+import { isUiLanguage, type Language, type PairIssue, type UiLanguage } from "./copy";
 
 // Retardos del simulador DEMO. No representan latencias reales del pipeline.
 const DEMO_TIMINGS = {
@@ -29,16 +29,16 @@ const DEMO_PHRASES: Readonly<Record<UiLanguage, { transcript: string; translatio
   en: { transcript: "Nice to meet you.", translation: "Encantado de conocerte." },
 };
 
-type Languages = Readonly<Record<Participant, UiLanguage>>;
+type Languages = Readonly<Record<Participant, Language>>;
 
 function otherParticipant(participant: Participant): Participant {
   return participant === "A" ? "B" : "A";
 }
 
-// ponytail: con dos idiomas, elegir el de la otra mitad los intercambia; con más idiomas habrá que excluirlo.
-function withLanguage(current: Languages, participant: Participant, language: UiLanguage): Languages {
-  if (current[participant] === language) return current;
-  return participant === "A" ? { A: language, B: current.A } : { A: current.B, B: language };
+/** Por qué el par no puede hablar en la DEMO: el mismo idioma en las dos personas o uno sin ejemplos DEMO. */
+function pairIssueOf(languages: Languages): PairIssue | undefined {
+  if (languages.A === languages.B) return "same";
+  return isUiLanguage(languages.A) && isUiLanguage(languages.B) ? undefined : "pending";
 }
 
 /** Resultado DEMO marcado como simulado y validado con el mismo contrato que usará el servidor. */
@@ -63,6 +63,7 @@ function demoResultEvent(turn: Turn): ConversationEvent {
 export function useDemoConversation(createRequestId: () => string) {
   const [state, dispatch] = useReducer(reduceConversation, initialConversation);
   const [languages, setLanguages] = useState<Languages>({ A: "es", B: "en" });
+  const pairIssue = pairIssueOf(languages);
   const recordingStartedAt = useRef(0);
 
   useEffect(() => {
@@ -120,6 +121,8 @@ export function useDemoConversation(createRequestId: () => string) {
         dispatch({ ...state.turn, type: "PRESS", participant });
         return;
       }
+      // Par bloqueado: los botones ya están deshabilitados; aquí no se pide UUID ni se inicia nada.
+      if (pairIssue !== undefined) return;
       const meta = parseTurnMeta({
         requestId: createRequestId(),
         source: languages[participant],
@@ -127,22 +130,25 @@ export function useDemoConversation(createRequestId: () => string) {
       });
       dispatch(meta.ok ? { type: "PRESS", participant, ...meta.value } : { type: "REJECTED", participant, code: meta.code });
     },
-    [state, languages, createRequestId],
+    [state, languages, pairIssue, createRequestId],
   );
 
   const cancel = useCallback(() => {
     dispatch({ type: "CANCEL" });
   }, []);
 
-  /** Solo en reposo y si cambia: el resultado y el aviso del par anterior no se muestran bajo los idiomas nuevos. */
+  /**
+   * Solo en reposo y si cambia, y solo el de esa persona (sin intercambio): un turno conserva su par y el último
+   * resultado sigue visible hasta un cambio real, que lo borra para no mostrarlo bajo idiomas que no son los suyos.
+   */
   const selectLanguage = useCallback(
-    (participant: Participant, language: UiLanguage) => {
+    (participant: Participant, language: Language) => {
       if (state.status !== "IDLE" || languages[participant] === language) return;
-      setLanguages((current) => withLanguage(current, participant, language));
+      setLanguages((current) => ({ ...current, [participant]: language }));
       dispatch({ type: "RESET" });
     },
     [state.status, languages],
   );
 
-  return { state, languages, press, cancel, selectLanguage };
+  return { state, languages, pairIssue, press, cancel, selectLanguage };
 }

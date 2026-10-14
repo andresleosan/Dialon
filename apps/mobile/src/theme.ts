@@ -1,88 +1,103 @@
-import { useColorScheme } from "react-native";
+import type { Participant } from "@dialon/core";
 
-// Tokens de DESIGN.md (adaptación de Singapore Airlines Translation Assistant, sin su marca): cambiar un color
-// exige recalcular su contraste. Cada mitad tiene su panel: B marino con texto blanco y A blanca con texto marino.
+// Paleta fija aprobada por Luis el 2026-10-14 (maqueta marino/blanco): no sigue el tema oscuro del sistema.
+// Cambiar un color exige recalcular su contraste (DESIGN.md). Algunos grises de la maqueta se oscurecieron lo
+// mínimo para llegar a 4,5:1 en texto pequeño.
+export const COLORS = {
+  marino: "#12295C",
+  blanco: "#FFFFFF",
+  fondo: "#EEF1F6",
+  tinta: "#142747",
+  apagado: "#606D82",
+  linea: "#DCE2EB",
+  vistaFondo: "#E0E6EE",
+  vistaTexto: "#57667B",
+  marcoFondo: "#E4E9F1",
+  marcoTexto: "#566881",
+  demoFondo: "#DFE6F0",
+  demoTexto: "#223D68",
+  pildora: "#CED6E3",
+  cabeceraModo: "#5C6E8A",
+  velo: "rgba(17, 40, 75, 0.27)",
+} as const;
+
+/** Colores del selector de idioma (superficie blanca). */
+export const PICKER = {
+  borde: "#D7DEEA",
+  ceja: "#5E7090",
+  cerrarFondo: "#F1F4F8",
+  cerrarIcono: "#455979",
+  buscadorBorde: "#CDD6E6",
+  buscadorIcono: "#657692",
+  marcador: "#65768E",
+  lista: "#69768A",
+  actual: "#EDF2F9",
+  autonimo: "#626D83",
+  etiqueta: "#606D82",
+  etiquetaBorde: "#DDE3EC",
+  etiquetaFondo: "#F8FAFC",
+  demoTexto: "#27496E",
+  demoBorde: "#D0DBE9",
+  demoFondo: "#E9EFF7",
+  pie: "#67758B",
+  pieLinea: "#E0E6EF",
+} as const;
+
+// Cada mitad tiene su panel: B marino con texto blanco y A blanca con texto marino.
 export interface Panel {
   readonly fondo: string;
-  readonly texto: string;
-  readonly texto2: string;
   readonly borde: string;
+  readonly texto: string;
+  readonly ceja: string;
+  readonly nota: string;
+  readonly linea: string;
+  readonly selectorFondo: string;
+  readonly selectorBorde: string;
   readonly circulo: string;
   readonly sobreCirculo: string;
+  readonly anillo: string;
+  readonly apagado: string;
   readonly grabando: string;
   readonly sobreGrabando: string;
-  readonly demo: string;
   readonly avisoFondo: string;
   readonly avisoTexto: string;
 }
 
-export interface Theme {
-  readonly pantalla: string;
-  readonly A: Panel;
-  readonly B: Panel;
-}
-
-const light: Theme = {
-  pantalla: "#FFFFFF",
+export const PANELS: Readonly<Record<Participant, Panel>> = {
   B: {
-    fondo: "#12295C",
-    texto: "#FFFFFF",
-    texto2: "#C9D4EA",
-    borde: "#AFC0E0",
-    circulo: "#FFFFFF",
-    sobreCirculo: "#12295C",
+    fondo: COLORS.marino,
+    borde: COLORS.marino,
+    texto: COLORS.blanco,
+    ceja: "#BFCDE7",
+    nota: "#C2CEE4",
+    linea: "rgba(255, 255, 255, 0.16)",
+    selectorFondo: "rgba(255, 255, 255, 0.07)",
+    selectorBorde: "rgba(255, 255, 255, 0.19)",
+    circulo: COLORS.blanco,
+    sobreCirculo: COLORS.marino,
+    anillo: "rgba(255, 255, 255, 0.055)",
+    apagado: "#AFC0E0",
     grabando: "#FFB4AB",
     sobreGrabando: "#5F1411",
-    demo: "#FFD98A",
     avisoFondo: "#FFE8A3",
     avisoTexto: "#3D2E00",
   },
   A: {
-    fondo: "#FFFFFF",
-    texto: "#12295C",
-    texto2: "#4B5568",
-    borde: "#6B7089",
-    circulo: "#12295C",
-    sobreCirculo: "#FFFFFF",
+    fondo: COLORS.blanco,
+    borde: COLORS.linea,
+    texto: COLORS.marino,
+    ceja: "#657594",
+    nota: "#62718C",
+    linea: "#E1E6EE",
+    selectorFondo: "#F1F4F9",
+    selectorBorde: "#DCE3EF",
+    circulo: COLORS.marino,
+    sobreCirculo: COLORS.blanco,
+    anillo: "rgba(18, 41, 92, 0.03)",
+    apagado: "#6B7089",
     grabando: "#B42318",
-    sobreGrabando: "#FFFFFF",
-    demo: "#6B4E00",
+    sobreGrabando: COLORS.blanco,
     avisoFondo: "#FFF4D6",
     avisoTexto: "#5C4400",
   },
 };
-
-const dark: Theme = {
-  pantalla: "#121417",
-  B: {
-    fondo: "#0E2149",
-    texto: "#FFFFFF",
-    texto2: "#C2CDE6",
-    borde: "#A3B4D8",
-    circulo: "#E8EEFB",
-    sobreCirculo: "#0E2149",
-    grabando: "#FFB4AB",
-    sobreGrabando: "#5F1411",
-    demo: "#FFD98A",
-    avisoFondo: "#3A2E00",
-    avisoTexto: "#FFE08A",
-  },
-  A: {
-    fondo: "#121417",
-    texto: "#D6E3FF",
-    texto2: "#B4B9C2",
-    borde: "#8C929C",
-    circulo: "#8AB4F8",
-    sobreCirculo: "#0A1B33",
-    grabando: "#F2B8B5",
-    sobreGrabando: "#410E0B",
-    demo: "#FFE08A",
-    avisoFondo: "#3A2E00",
-    avisoTexto: "#FFE08A",
-  },
-};
-
-/** Tema claro u oscuro según el sistema. */
-export function useTheme(): Theme {
-  return useColorScheme() === "dark" ? dark : light;
-}

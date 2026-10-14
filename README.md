@@ -12,7 +12,7 @@ llegan en bloques posteriores.
 |---|---|
 | `packages/contracts` | Tipos, códigos de error, límites y validadores compartidos |
 | `packages/core` | Máquina de turnos (reductor puro) |
-| `apps/mobile` | App Expo: `src/screens/FaceToFaceScreen.tsx`, controlador DEMO, textos es/en y tema |
+| `apps/mobile` | App Expo: pantalla (`src/screens/FaceToFaceScreen.tsx`), selector de idioma (`LanguagePicker.tsx`), controlador DEMO, textos es/en, iconos y tema fijo |
 
 ## Ejecutar las comprobaciones
 
@@ -28,7 +28,7 @@ npm install pnpm@10.34.6 --prefix .tools/pnpm --cache .tools/.cache/npm --ignore
 ./.tools/pnpm/node_modules/.bin/pnpm lint       # ESLint 10 + reglas de React Hooks
 ```
 
-La exportación web real se compila con Expo/Metro. No hay build de Android.
+La exportación web real se compila con Expo/Metro e incluye el favicon (`apps/mobile/assets/favicon.png` → `favicon.ico`). No hay build de Android.
 
 ## Exportación web para probar en línea
 
@@ -38,16 +38,22 @@ Runtime: Node 24.16.0 y pnpm 10.34.6. Parámetros de Pages: [guía de despliegue
 
 ## Modo DEMO
 
-- Las dos mitades muestran siempre «DEMO: traducción simulada, no real» y que no usa micrófono ni reproduce audio.
-- Dos toques: el primero inicia una escucha simulada y el segundo la termina. Después aparece en la otra mitad una
-  frase de ejemplo marcada `[DEMO]` y se muestra el estado «voz simulada» (sin audio), que se puede detener.
+- Marca DEMO visible (cabecera en el teléfono, pie en escritorio) y, en cada panel vacío, «Demo: sin audio ni
+  traducción real.». Diseño en [DESIGN.md](DESIGN.md): teléfono 50/50 con B girada, escritorio con paneles lado a
+  lado y vista «Cara a cara» opcional; paleta marino/blanco fija aunque el sistema use tema oscuro.
+- Dos toques: el primero inicia una escucha simulada y el segundo la termina. Después, quien habló ve su frase y la
+  otra mitad la traducción de ejemplo, ambas marcadas `[DEMO]`, con el estado «voz simulada» (sin audio), que se puede
+  detener.
 - Cada turno usa un UUID nuevo; metadatos, duración y resultado pasan por los validadores de `@dialon/contracts`.
-- Cambiar el idioma en reposo intercambia los idiomas de las dos mitades y borra el resultado anterior.
+- Cada persona elige su idioma en su propio selector (sin intercambio). Español e inglés tienen ejemplos DEMO;
+  portugués, francés, alemán e italiano están «por validar»: se pueden elegir, pero bloquean «Hablar» en las dos
+  mitades con una explicación, igual que un par con el mismo idioma. Los idiomas solo cambian en reposo; un cambio
+  real borra el resultado anterior.
 
 ## Verificación
 
 - Pruebas automáticas: comandos de arriba.
-- QA visual en navegador: [`docs/verification/2026-10-13-qa-visual-demo.md`](docs/verification/2026-10-13-qa-visual-demo.md).
+- QA actual de interfaz, selector y favicon: [`docs/verification/2026-10-14-ui-selector-favicon.md`](docs/verification/2026-10-14-ui-selector-favicon.md).
 - Auditoría de dependencias: [`docs/verification/2026-10-13-auditoria-dependencias.md`](docs/verification/2026-10-13-auditoria-dependencias.md).
-- Pendiente: Android real, TalkBack, APK, audio y traducción reales; comprobar en Android la letra grande
-  (en la vista web, con zoom de texto ×1,3 y ×2, cada mitad desplaza su cuerpo y mantiene las acciones ancladas).
+- Pendiente: Android real, TalkBack, APK, audio y traducción reales; comprobar en Android la letra grande, el teclado
+  nativo con el selector abierto (sobre todo el de B, girado) y que el foco vuelva al selector al cerrarlo.
