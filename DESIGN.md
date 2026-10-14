@@ -1,6 +1,6 @@
 # Dialon — diseño Android (BORRADOR)
 
-> **Diseño DEMO autorizado por Luis para publicación (2026-10-13); no constituye una marca final.** Los colores son provisionales
+> **Adaptación marino/blanco autorizada por Luis para publicación el 2026-10-14 a las 00:11 UTC; no constituye una marca final.** Los colores son provisionales
 > y se pueden cambiar sin tocar la lógica. Se aplica en modo DEMO en `apps/mobile/src/theme.ts` y
 > `apps/mobile/src/screens/FaceToFaceScreen.tsx` (QA web anterior: `docs/verification/2026-10-13-qa-visual-demo.md`).
 
@@ -16,14 +16,20 @@ estructura; no se copian recursos, colores de marca ni textos. Capturas locales 
 | Meta AI | [Live translation](https://mobbin.com/screens/55a61904-5362-4e9a-b67d-f64d5a976d96) | lectura tranquila; idiomas subordinados; un único control azul claramente principal |
 | CapCut | [Video translator](https://mobbin.com/screens/81cf3e13-fc99-4b28-8bbe-4a11584205fc) | oscuro con superficies delimitadas; etiqueta secundaria frente a valor principal; botón principal de alto contraste |
 
-Dirección elegida:
-- Cada mitad es un panel de lectura. Según su lector, arriba va la tarjeta de lectura con la traducción en grande
-  y abajo, junto al botón, el idioma y el estado. Las dos tarjetas quedan enfrentadas en el centro de la pantalla.
-- Un solo control azul por mitad: el botón principal. El idioma elegido lleva relleno tonal claro, ✓ y negrita,
-  nunca el azul del botón. «Cancelar» es un botón de contorno.
-- El aviso DEMO pasa a ser una nota subordinada (14/20, barra lateral de aviso) con sus dos líneas enteras.
-- En escritorio, el contenido de cada mitad mide como máximo 760 px y va centrado. Las mitades siguen ocupando
-  el 50 % del alto y B sigue girada 180°.
+Dirección elegida (2026-10-13, pedida por Luis; sustituye a la de tarjetas y botones anchos): adaptación de
+Singapore Airlines Translation Assistant, sin su marca ni su navegación.
+- B, arriba, es un panel azul marino pleno con texto blanco. A, abajo, es un panel blanco con texto marino. En
+  oscuro, B sigue marino y A pasa a `#121417` con texto azul claro.
+- Sin tarjetas: la traducción, o el título del estado vacío, es el texto grande protagonista (32/40) arriba del
+  panel según su lector.
+- Al pie de cada panel van el idioma y el micrófono juntos:
+  - selector discreto de texto (✓ y negrita en el elegido);
+  - control principal circular de 64 dp con un icono geométrico hecho con vistas (micrófono, cuadrado de parar o
+    puntos de espera);
+  - etiqueta corta visible al lado; el nombre accesible completo no cambia.
+- La nota DEMO y la de audio siguen enteras en el cuerpo, en 14/20, sin dominar. «Cancelar» es un botón de contorno
+  discreto.
+- En escritorio el contenido mide como máximo 760 px y va centrado. 50/50, B girada 180° y A primero en el árbol.
 
 ## Principios
 
@@ -36,24 +42,22 @@ Dirección elegida:
 
 El tema claro u oscuro sigue la configuración del sistema. Contrastes calculados con la fórmula WCAG.
 
-| Token | Claro | Oscuro | Uso |
-|---|---|---|---|
-| `fondo` | `#FFFFFF` | `#121417` | fondo de pantalla, tarjeta de lectura, selector de idioma y «Cancelar» |
-| `superficie` | `#F3F4F6` | `#1C1F24` | fondo de cada mitad |
-| `texto` | `#1B1D20` | `#E8EAED` | traducción, idiomas y «Cancelar» |
-| `texto2` | `#4B5059` | `#B4B9C2` | "Dijiste: …", guía, estado y 2.ª línea DEMO |
-| `acento` / `sobreAcento` | `#1D5BBF` / `#FFFFFF` | `#8AB4F8` / `#0A1B33` | botón principal, único control azul (provisional) |
-| `grabando` / `sobreGrabando` | `#B42318` / `#FFFFFF` | `#F2B8B5` / `#410E0B` | botón durante la escucha y ● del estado |
-| `contorno` | `#6B7079` | `#8C929C` | bordes del selector, «Cancelar» y botón deshabilitado |
-| `separador` | `#D5D9DF` | `#2E333A` | borde decorativo de la tarjeta de lectura |
-| `seleccion` / `sobreSeleccion` | `#D8E4FA` / `#0F3A80` | `#23395D` / `#D6E3FF` | idioma elegido (relleno tonal, ✓ y negrita) |
-| `avisoFondo` / `avisoTexto` | `#FFF4D6` / `#5C4400` | `#3A2E00` / `#FFE08A` | avisos; `avisoTexto` también en la 1.ª línea DEMO |
-| `avisoBorde` | `#A67A00` | `#E0B341` | barra lateral de la nota DEMO |
+Fondo de pantalla (`pantalla`): `#FFFFFF` en claro y `#121417` en oscuro. Cada mitad tiene su propio panel:
+
+| Token del panel | B claro | A claro | B oscuro | A oscuro | Uso |
+|---|---|---|---|---|---|
+| `fondo` | `#12295C` | `#FFFFFF` | `#0E2149` | `#121417` | fondo de la mitad |
+| `texto` | `#FFFFFF` | `#12295C` | `#FFFFFF` | `#D6E3FF` | traducción, título vacío e idioma elegido |
+| `texto2` | `#C9D4EA` | `#4B5568` | `#C2CDE6` | `#B4B9C2` | guía, "Dijiste", estado, nota de audio, etiqueta |
+| `borde` | `#AFC0E0` | `#6B7089` | `#A3B4D8` | `#8C929C` | contorno de «Cancelar» y del círculo deshabilitado |
+| `circulo` / `sobreCirculo` | `#FFFFFF` / `#12295C` | `#12295C` / `#FFFFFF` | `#E8EEFB` / `#0E2149` | `#8AB4F8` / `#0A1B33` | micrófono y su icono |
+| `grabando` / `sobreGrabando` | `#FFB4AB` / `#5F1411` | `#B42318` / `#FFFFFF` | `#FFB4AB` / `#5F1411` | `#F2B8B5` / `#410E0B` | círculo durante la escucha |
+| `demo` | `#FFD98A` | `#6B4E00` | `#FFD98A` | `#FFE08A` | línea "DEMO: …" |
+| `avisoFondo` / `avisoTexto` | `#FFE8A3` / `#3D2E00` | `#FFF4D6` / `#5C4400` | `#3A2E00` / `#FFE08A` | `#3A2E00` / `#FFE08A` | avisos |
 
 Mínimos medidos (fórmula WCAG):
-- Texto: 6.36:1 en claro y 8.18:1 en oscuro (`sobreAcento` sobre `acento`); idioma elegido 8.46:1 y 8.98:1.
-- Controles frente a la mitad (`contorno` sobre `superficie`): 4.52:1 en claro y 5.28:1 en oscuro. Botón principal
-  frente a la mitad: 5.78:1 y 7.84:1. Barra DEMO: 3.53:1 y 8.41:1.
+- Texto: 7.50:1 en claro y 9.37:1 en oscuro.
+- Controles e iconos frente a su fondo: 4.88:1 en claro y 5.89:1 en oscuro.
 - Objetivo: ≥4.5:1 en texto y ≥3:1 en controles.
 
 ## Tipografía y espaciado
@@ -61,31 +65,27 @@ Mínimos medidos (fórmula WCAG):
 - Fuente del sistema (Roboto en Android). Sin fuentes descargadas.
 - Los tamaños escalan con el ajuste de letra de Android y no se limita esa escala: si el contenido no cabe, el
   cuerpo de cada mitad se desplaza y las acciones quedan ancladas.
-- Escala (tamaño/interlineado): traducción recibida 28/36; botones 18/24 seminegrita (principal y «Cancelar»);
-  idioma y estado 16/24 medio; "Dijiste:", guía y avisos 16/24; nota DEMO 14/20.
-- Espaciado en pasos de 4, 8, 12 y 16: márgenes laterales de 16, 12 sobre el cuerpo, 8 entre bloques y relleno de
-  12/16 en la tarjeta de lectura. Esquinas de 12 en controles y avisos, y de 16 en el botón principal y la tarjeta.
+- Escala (tamaño/interlineado): traducción recibida y título vacío 32/40; etiqueta del micrófono y «Cancelar» 18/24
+  seminegrita; idioma y estado 16/24; "Dijiste:", guía y avisos 16/24; nota DEMO 14/20.
+- Espaciado en pasos de 4, 8, 12 y 16: márgenes laterales de 24 en el cuerpo y 16 en las acciones, 12 entre bloques.
 - Contenido de cada mitad (cuerpo y acciones): ancho máximo de 760 px, centrado; en el teléfono ocupa todo el ancho.
-- Botón principal a todo el ancho y de ≥64 dp de alto. «Cancelar» comparte fila mientras el principal tenga al
-  menos 200 dp; si no, baja a otra fila a todo el ancho. Ningún control mide menos de 48 dp.
+- Micrófono: círculo de 64 dp y botón (círculo + etiqueta) de ≥64 dp de alto, alineado al final de la fila.
+  «Cancelar» (≥48 dp) va al principio de la fila y, si no cabe, baja a otra. Ningún control mide menos de 48 dp.
 
 ## Pantalla cara a cara
 
 ```
-┌─────────────────────────────────┐
-│ [       Tap to speak        ]   │  ← mitad de B (todo girado 180°;
-│ (✓ English | Español)  ✓ Ready  │    aquí se dibuja sin girar)
-│ ▌DEMO: simulated translation…   │
-│ ┌─────────────────────────────┐ │
-│ │ Hello, how are you?         │ │
-│ └─────────────────────────────┘ │
-├─────────────────────────────────┤
-│ ┌─────────────────────────────┐ │
-│ │ Dijiste: Hola, ¿cómo estás? │ │  ← mitad de A
-│ └─────────────────────────────┘ │
-│ ▌DEMO: traducción simulada, …   │
-│ (✓ Español | English)  ✓ Listo  │
-│ [     Toca para hablar      ]   │
+┌─────────────────────────────────┐  ← mitad de B: marino, texto blanco
+│ Hello, how are you?             │    (todo girado 180°; aquí sin girar)
+│ DEMO: simulated translation, …  │
+│ ✓ English   Español    ✓ Ready  │
+│             Tap to speak  (🎙)  │
+├─────────────────────────────────┤  ← mitad de A: blanca, texto marino
+│ Conversación de ejemplo         │
+│ Toca el botón y verás …         │
+│ DEMO: traducción simulada, …    │
+│ ✓ Español   English    ✓ Listo  │
+│         Toca para hablar  (🎙)  │
 └─────────────────────────────────┘
 ```
 
@@ -93,13 +93,13 @@ Mínimos medidos (fórmula WCAG):
   (textos y controles); A abajo.
 - Cada mitad, de arriba abajo según su lector:
   1. un cuerpo desplazable propio con, en este orden:
-     - la tarjeta de lectura (traducción recibida 28/36, "Dijiste: …" o la guía de ejemplo);
+     - la lectura: traducción recibida 32/40, "Dijiste: …" o el estado vacío (título 32/40 y guía);
      - los avisos de esa mitad;
      - la nota DEMO;
-     - la fila de idioma (selector segmentado) y estado (icono y texto);
-  2. las acciones, ancladas fuera del cuerpo: botón principal y, cuando aplica, "Cancelar" como acción secundaria.
-- Con letra normal la tarjeta crece hasta llenar el hueco libre. Con letra grande el cuerpo se desplaza y la
-  tarjeta queda la primera.
+     - la fila de idioma (selector de texto) y estado (icono y texto), al pie del cuerpo;
+  2. las acciones, ancladas fuera del cuerpo: "Cancelar" cuando aplica y el micrófono circular con su etiqueta.
+- Con letra normal la lectura ocupa el hueco libre y deja idioma y micrófono juntos al pie. Con letra grande el
+  cuerpo se desplaza y la lectura queda la primera.
 - Los textos de cada mitad van en el idioma de esa persona (es/en al inicio).
 - El selector solo ofrece idiomas admitidos por el servidor y con voz disponible. Cambiarlo no altera un turno
   en curso.
@@ -108,7 +108,7 @@ Mínimos medidos (fórmula WCAG):
 
 | Estado de la conversación | Mitad que habla | Otra mitad |
 |---|---|---|
-| Listo | "Toca para hablar" · micrófono · `acento` | igual (las dos pueden empezar) |
+| Listo | "Toca para hablar" · círculo `circulo` con micrófono | igual (las dos pueden empezar) |
 | Preparando el micrófono | "Preparando…" · deshabilitado | "Espera: habla la otra persona" · deshabilitado |
 | Grabando | "Grabando… toca para terminar" · `grabando` + "Cancelar" | "Espera: habla la otra persona" · deshabilitado |
 | Traduciendo | "Traduciendo…" · deshabilitado + "Cancelar" | "Espera: habla la otra persona" · deshabilitado |
@@ -132,9 +132,9 @@ Mínimos medidos (fórmula WCAG):
 
 ### Nota DEMO
 
-- En modo DEMO, las dos mitades muestran siempre, en su idioma, "DEMO: traducción simulada, no real" (en
-  `avisoTexto` y seminegrita) y "No usa el micrófono ni reproduce audio." (en `texto2`). Las dos líneas van enteras,
-  con una barra lateral `avisoBorde`, justo encima de la fila de idioma.
+- En modo DEMO, las dos mitades muestran siempre, en su idioma, "DEMO: traducción simulada, no real" (en `demo` y
+  seminegrita) y "No usa el micrófono ni reproduce audio." (en `texto2`). Las dos líneas van enteras, en 14/20,
+  justo encima de la fila de idioma.
 - Nunca se ocultan: están en el cuerpo de cada mitad, visibles o alcanzables desplazándolo. Cada traducción
   simulada lleva además el prefijo [DEMO].
 
@@ -153,12 +153,15 @@ Mínimos medidos (fórmula WCAG):
   - Un botón deshabilitado explica por qué ("Espera: habla la otra persona").
   - La traducción nueva se anuncia en una región viva educada (`polite`).
   - Cada opción del selector de idioma se nombra solo con el idioma. La elegida se distingue por ✓, negrita y
-    relleno tonal, no solo por el color.
+    subrayado, no solo por el color.
+  - El micrófono conserva el nombre completo ("Toca para hablar, Español"); su etiqueta visible corta está
+    contenida en ese nombre.
 - **Estados sin depender del color:**
-  - el botón deshabilitado es de contorno, sin relleno;
-  - en la escucha, el botón cambia de texto y de color y aparece «Cancelar»;
-  - el estado lleva icono (✓ … ● ▶ ■) y texto; el ● de la escucha propia va en `grabando`.
-- **Foco de teclado (web):** se mantiene el anillo del navegador, coloreado con `acento` para distinguirlo en ambos temas. Ningún estilo lo oculta ni lo recorta. El anillo negro predeterminado medía solo 1.15:1 sobre la superficie oscura en la comprobación inicial; se exige ≥3:1 en la validación final.
+  - el círculo deshabilitado es de contorno, sin relleno, con tres puntos;
+  - en la escucha, el icono pasa de micrófono a cuadrado de parar, cambian etiqueta y color y aparece «Cancelar»;
+  - el estado lleva icono (✓ … ● ▶ ■) y texto.
+- **Foco de teclado (web):** se mantiene el anillo del navegador, coloreado con el `texto` de cada panel para
+  distinguirlo en ambos temas. Ningún estilo lo oculta ni lo recorta; se exige ≥3:1 en la validación final.
 - **Movimiento:** esta DEMO no añade animaciones. Los cambios de estado son inmediatos.
 - **Orientación:** vertical. Hay que comprobar en el dispositivo que los toques en la mitad girada caen en su
   control.
@@ -175,6 +178,8 @@ Mínimos medidos (fórmula WCAG):
 | Escala de letra del sistema sin recortes | cuerpo desplazable y acciones ancladas | regresión web ×1,3/×2 + Android con letra máxima |
 | Orden A → B en el lector | pantalla | TalkBack en dispositivo |
 | Nota DEMO entera en las dos mitades, visible o alcanzable | cuerpo desplazable | prueba de componente + QA web |
-| Un solo control azul por mitad; idioma elegido tonal con ✓ | selector y botones | revisión visual en la QA web |
+| B marino y A blanca; micrófono circular con etiqueta corta y nombre completo | paneles y acciones | prueba de componente + QA web |
 | Ancho máximo de 760 px centrado, sin cambiar el 50/50 ni el giro de B | cuerpo y acciones | QA web a 1440×900 |
 | Sin animación con "Quitar animaciones" | indicador de grabación | ajuste del sistema en dispositivo |
+
+El estado vacío usa «Tu traducción» / «Your translation» como título, con la guía completa en 14/20. Las etiquetas principales visibles se acortan a «Hablar», «Terminar», «Detener» / «Speak», «Finish», «Stop»; sus nombres accesibles completos permanecen. Esto mantiene el estado inicial compacto a 360×640 sin reducir el texto protagonista ni limitar la escala de fuente.

@@ -118,12 +118,12 @@ describe("FaceToFaceScreen DEMO: disposición, idiomas y tema", () => {
     expect(halfB.getByText(NO_AUDIO.es)).toBeOnTheScreen();
   });
 
-  it("sigue el tema oscuro del sistema con los tokens de DESIGN.md", async () => {
+  it("sigue el tema oscuro del sistema con los tokens de DESIGN.md: B sigue marino y A pasa a oscuro", async () => {
     jest.mocked(useColorScheme).mockReturnValue("dark");
-    const { halfA } = await renderScreen();
+    await renderScreen();
     expect(screen.getByTestId("cara-a-cara")).toHaveStyle({ backgroundColor: "#121417" });
-    expect(screen.getByTestId("mitad-A")).toHaveStyle({ backgroundColor: "#1C1F24" });
-    expect(halfA.getByRole("button", { name: A.start })).toHaveStyle({ backgroundColor: "#8AB4F8" });
+    expect(screen.getByTestId("mitad-B")).toHaveStyle({ backgroundColor: "#0E2149" });
+    expect(screen.getByTestId("mitad-A")).toHaveStyle({ backgroundColor: "#121417" });
   });
 });
 
@@ -157,6 +157,31 @@ describe("FaceToFaceScreen DEMO: turnos simulados", () => {
     await nextDemoStep();
     expect(halfA.getByRole("button", { name: A.start })).toBeEnabled();
     expect(halfB.getByText("[DEMO] Hello, how are you?")).toBeOnTheScreen();
+  });
+
+  it("el estado vacío lleva un título corto en el idioma de cada mitad y desaparece al llegar el turno", async () => {
+    const { halfA, halfB } = await renderScreen();
+    expect(halfA.getByText("Tu traducción")).toBeOnTheScreen();
+    expect(halfB.getByText("Your translation")).toBeOnTheScreen();
+
+    await speakTurn(halfA, A);
+    expect(halfB.getByText("[DEMO] Hello, how are you?")).toBeOnTheScreen();
+    expect(halfB.queryByText("Your translation")).toBeNull();
+    expect(halfA.queryByText("Tu traducción")).toBeNull();
+  });
+
+  it("el micrófono conserva su nombre completo y muestra una etiqueta corta contenida en él según el estado", async () => {
+    const { halfA, halfB } = await renderScreen();
+    expect(within(halfA.getByRole("button", { name: A.start })).getByText("Hablar")).toBeOnTheScreen();
+    expect(within(halfB.getByRole("button", { name: B.start })).getByText("Speak")).toBeOnTheScreen();
+
+    await fireEvent.press(halfA.getByRole("button", { name: A.start }));
+    await nextDemoStep();
+    const finish = halfA.getByRole("button", { name: A.finish });
+    expect(within(finish).getByText("Terminar")).toBeOnTheScreen();
+    const wait = halfB.getByRole("button", { name: B.wait });
+    expect(wait).toBeDisabled();
+    expect(within(wait).getByText("Wait")).toBeOnTheScreen();
   });
 
   it("B habla en inglés y A recibe la traducción simulada en español", async () => {

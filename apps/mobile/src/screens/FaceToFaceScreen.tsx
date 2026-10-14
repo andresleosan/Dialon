@@ -3,7 +3,7 @@ import type { ConversationState, Participant } from "@dialon/core";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COPY, UI_LANGUAGES, type ButtonKey, type StatusKey, type UiLanguage } from "../copy";
-import { useTheme, type Theme } from "../theme";
+import { useTheme, type Panel } from "../theme";
 import { useDemoConversation } from "../useDemoConversation";
 
 export interface FaceToFaceScreenProps {
@@ -90,12 +90,36 @@ function describeHalf(state: ConversationState, participant: Participant): HalfV
   }
 }
 
+/**
+ * Icono geométrico del micrófono hecho con vistas (sin fuentes ni imágenes): micrófono para hablar, cuadrado para
+ * parar y tres puntos mientras no se puede tocar. La forma cambia con el estado, no solo el color.
+ */
+function MicIcon({ shape, color }: { readonly shape: "mic" | "stop" | "wait"; readonly color: string }) {
+  if (shape === "stop") return <View style={[styles.stopIcon, { backgroundColor: color }]} />;
+  if (shape === "wait") {
+    return (
+      <View style={styles.waitIcon}>
+        {[0, 1, 2].map((dot) => (
+          <View key={dot} style={[styles.waitDot, { backgroundColor: color }]} />
+        ))}
+      </View>
+    );
+  }
+  return (
+    <View style={styles.micIcon}>
+      <View style={[styles.micHead, { backgroundColor: color }]} />
+      <View style={[styles.micCradle, { borderColor: color }]} />
+      <View style={[styles.micStem, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
 interface HalfProps {
   readonly participant: Participant;
   readonly language: UiLanguage;
   readonly view: HalfView;
   readonly languagesLocked: boolean;
-  readonly theme: Theme;
+  readonly panel: Panel;
   readonly onPress: () => void;
   readonly onCancel: () => void;
   readonly onSelectLanguage: (language: UiLanguage) => void;
@@ -106,7 +130,7 @@ function ConversationHalf({
   language,
   view,
   languagesLocked,
-  theme,
+  panel,
   onPress,
   onCancel,
   onSelectLanguage,
@@ -114,20 +138,18 @@ function ConversationHalf({
   const copy = COPY[language];
   const named = (label: string) => `${label}, ${copy.languageName}`;
   const notice = view.notice && (copy.notices[view.notice] ?? copy.noticeFallback);
-  const buttonColors = view.buttonDisabled
-    ? { background: theme.superficie, border: theme.contorno, text: theme.texto2 }
+  const circle = view.buttonDisabled
+    ? { background: "transparent", border: panel.borde, icon: panel.texto2 }
     : view.listening
-      ? { background: theme.grabando, border: theme.grabando, text: theme.sobreGrabando }
-      : { background: theme.acento, border: theme.acento, text: theme.sobreAcento };
+      ? { background: panel.grabando, border: panel.grabando, icon: panel.sobreGrabando }
+      : { background: panel.circulo, border: panel.circulo, icon: panel.sobreCirculo };
+  const shape = view.buttonDisabled ? "wait" : view.listening || view.button === "stopVoice" ? "stop" : "mic";
+  const focus = { outlineColor: panel.texto };
 
   return (
     <View
       testID={`mitad-${participant}`}
-      style={[
-        styles.half,
-        { backgroundColor: theme.superficie },
-        participant === "A" ? { borderTopColor: theme.contorno, borderTopWidth: StyleSheet.hairlineWidth } : styles.rotated,
-      ]}
+      style={[styles.half, { backgroundColor: panel.fondo }, participant === "B" && styles.rotated]}
     >
       {/* Cuerpo desplazable propio: con letra ampliada todo lo informativo se lee entero haciendo scroll. */}
       <ScrollView
@@ -135,49 +157,48 @@ function ConversationHalf({
         style={styles.body}
         contentContainerStyle={[styles.column, styles.bodyContent]}
       >
-        {/* Tarjeta de lectura: la traducción recibida es lo más grande de la mitad y ocupa el hueco libre. */}
-        <View style={[styles.reading, { backgroundColor: theme.fondo, borderColor: theme.separador }]}>
+        {/* Lectura sin tarjeta: la traducción, o el título vacío, es el texto grande protagonista del panel. */}
+        <View style={styles.reading}>
           {view.received !== undefined && (
-            <Text aria-live="polite" style={[styles.received, { color: theme.texto }]}>
+            <Text aria-live="polite" style={[styles.headline, { color: panel.texto }]}>
               {view.received}
             </Text>
           )}
           {view.said !== undefined && (
-            <Text style={[styles.said, { color: theme.texto2 }]}>{`${copy.youSaid} ${view.said}`}</Text>
+            <Text style={[styles.body16, { color: panel.texto2 }]}>{`${copy.youSaid} ${view.said}`}</Text>
           )}
           {view.received === undefined && view.said === undefined && (
-            <Text style={[styles.said, { color: theme.texto2 }]}>{copy.empty}</Text>
+            <>
+              <Text style={[styles.headline, { color: panel.texto }]}>{copy.emptyTitle}</Text>
+              <Text style={[styles.small, { color: panel.texto2 }]}>{copy.empty}</Text>
+            </>
           )}
         </View>
 
         {notice !== undefined && (
-          <View style={[styles.notice, { backgroundColor: theme.avisoFondo }]}>
-            <Text aria-hidden style={[styles.noticeText, { color: theme.avisoTexto }]}>
+          <View style={[styles.notice, { backgroundColor: panel.avisoFondo }]}>
+            <Text aria-hidden style={[styles.body16, { color: panel.avisoTexto }]}>
               !
             </Text>
-            <Text role="alert" style={[styles.noticeText, styles.grow, { color: theme.avisoTexto }]}>
+            <Text role="alert" style={[styles.body16, styles.grow, { color: panel.avisoTexto }]}>
               {notice}
             </Text>
           </View>
         )}
 
-        {/* Nota DEMO subordinada: sus dos líneas siempre enteras, con barra lateral de aviso. */}
-        <View style={[styles.demo, { borderLeftColor: theme.avisoBorde }]}>
-          <Text style={[styles.demoText, styles.demoTitle, { color: theme.avisoTexto }]}>{copy.demoBanner}</Text>
-          <Text style={[styles.demoText, { color: theme.texto2 }]}>{copy.noAudio}</Text>
+        {/* Nota DEMO entera y discreta, siempre en el cuerpo. */}
+        <View>
+          <Text style={[styles.small, styles.strong, { color: panel.demo }]}>{copy.demoBanner}</Text>
+          <Text style={[styles.small, { color: panel.texto2 }]}>{copy.noAudio}</Text>
         </View>
 
-        {/* Idioma y estado junto a las acciones. El idioma elegido es tonal con ✓: nunca el azul del botón. */}
+        {/* Idioma discreto al pie del panel, junto al micrófono; el elegido lleva ✓, negrita y subrayado. */}
         <View style={styles.controls}>
-          <View
-            role="radiogroup"
-            aria-label={copy.languageGroup}
-            style={[styles.segments, { backgroundColor: theme.fondo, borderColor: theme.contorno }]}
-          >
-            {UI_LANGUAGES.map((option, index) => {
+          <View role="radiogroup" aria-label={copy.languageGroup} style={styles.languages}>
+            {UI_LANGUAGES.map((option) => {
               const selected = option === language;
               const name = COPY[option].languageName;
-              const color = selected ? theme.sobreSeleccion : languagesLocked ? theme.texto2 : theme.texto;
+              const color = selected ? panel.texto : panel.texto2;
               return (
                 <Pressable
                   key={option}
@@ -188,66 +209,55 @@ function ConversationHalf({
                   onPress={() => {
                     onSelectLanguage(option);
                   }}
-                  style={[
-                    styles.segment,
-                    { outlineColor: theme.acento },
-                    index === 0 ? styles.segmentFirst : [styles.segmentNext, { borderLeftColor: theme.contorno }],
-                    index === UI_LANGUAGES.length - 1 && styles.segmentLast,
-                    selected && { backgroundColor: theme.seleccion },
-                  ]}
+                  style={[styles.language, focus, selected && { borderBottomColor: panel.texto }]}
                 >
                   {selected && (
-                    <Text aria-hidden style={[styles.segmentText, styles.segmentSelected, { color }]}>
+                    <Text aria-hidden style={[styles.body16, styles.strong, { color }]}>
                       ✓
                     </Text>
                   )}
-                  <Text style={[styles.segmentText, selected && styles.segmentSelected, { color }]}>{name}</Text>
+                  <Text style={[styles.body16, selected ? styles.strong : styles.medium, { color }]}>{name}</Text>
                 </Pressable>
               );
             })}
           </View>
           <View style={styles.statusRow}>
-            <Text
-              aria-hidden
-              style={[styles.status, { color: view.status === "listening" ? theme.grabando : theme.texto2 }]}
-            >
+            <Text aria-hidden style={[styles.body16, styles.medium, { color: panel.texto2 }]}>
               {STATUS_ICON[view.status]}
             </Text>
-            <Text style={[styles.status, styles.shrink, { color: theme.texto2 }]}>{copy.status[view.status]}</Text>
+            <Text style={[styles.body16, styles.medium, styles.shrink, { color: panel.texto2 }]}>
+              {copy.status[view.status]}
+            </Text>
           </View>
         </View>
       </ScrollView>
 
-      {/* Acciones ancladas fuera del cuerpo: siempre visibles y tocables, aunque el cuerpo esté desplazado. */}
+      {/* Acciones ancladas fuera del cuerpo: «Cancelar» discreto y el micrófono circular con su etiqueta corta. */}
       <View style={[styles.column, styles.actions]}>
-        <Pressable
-          role="button"
-          aria-label={named(copy.button[view.button])}
-          disabled={view.buttonDisabled}
-          onPress={onPress}
-          style={({ pressed }) => [
-            styles.primary,
-            { backgroundColor: buttonColors.background, borderColor: buttonColors.border, outlineColor: theme.acento },
-            pressed && styles.pressed,
-          ]}
-        >
-          <Text style={[styles.primaryText, { color: buttonColors.text }]}>{copy.button[view.button]}</Text>
-        </Pressable>
-
         {view.showCancel && (
           <Pressable
             role="button"
             aria-label={named(copy.cancel)}
             onPress={onCancel}
-            style={({ pressed }) => [
-              styles.secondary,
-              { backgroundColor: theme.fondo, borderColor: theme.contorno, outlineColor: theme.acento },
-              pressed && styles.pressed,
-            ]}
+            style={({ pressed }) => [styles.cancel, focus, { borderColor: panel.borde }, pressed && styles.pressed]}
           >
-            <Text style={[styles.secondaryText, { color: theme.texto }]}>{copy.cancel}</Text>
+            <Text style={[styles.label, { color: panel.texto }]}>{copy.cancel}</Text>
           </Pressable>
         )}
+        <Pressable
+          role="button"
+          aria-label={named(copy.button[view.button])}
+          disabled={view.buttonDisabled}
+          onPress={onPress}
+          style={({ pressed }) => [styles.mic, focus, pressed && styles.pressed]}
+        >
+          <Text style={[styles.label, styles.shrink, { color: view.buttonDisabled ? panel.texto2 : panel.texto }]}>
+            {copy.buttonShort[view.button]}
+          </Text>
+          <View style={[styles.circle, { backgroundColor: circle.background, borderColor: circle.border }]}>
+            <MicIcon shape={shape} color={circle.icon} />
+          </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -269,7 +279,7 @@ export function FaceToFaceScreen({ createRequestId }: FaceToFaceScreenProps) {
       language={languages[participant]}
       view={describeHalf(state, participant)}
       languagesLocked={languagesLocked}
-      theme={theme}
+      panel={theme[participant]}
       onPress={() => {
         press(participant);
       }}
@@ -286,7 +296,7 @@ export function FaceToFaceScreen({ createRequestId }: FaceToFaceScreenProps) {
       style={[
         styles.screen,
         {
-          backgroundColor: theme.fondo,
+          backgroundColor: theme.pantalla,
           paddingTop: insets.top,
           paddingBottom: insets.bottom,
           paddingLeft: insets.left,
@@ -307,31 +317,32 @@ const styles = StyleSheet.create({
   // Cuerpo y acciones comparten columna: todo el ancho en el teléfono y 760 px centrados en escritorio. Solo
   // cambia el ancho; cada mitad sigue midiendo la mitad del alto.
   column: { width: "100%", maxWidth: 760, alignSelf: "center" },
-  // El cuerpo ocupa lo que dejan las acciones y desplaza su contenido. Si sobra alto, la tarjeta de lectura lo
-  // llena y deja la nota DEMO y el idioma junto a las acciones.
+  // El cuerpo ocupa lo que dejan las acciones y desplaza su contenido. Si sobra alto, la lectura lo llena y deja
+  // la nota DEMO y el idioma al pie, junto al micrófono.
   body: { flex: 1 },
-  bodyContent: { flexGrow: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 8 },
-  reading: { flexGrow: 1, gap: 8, borderRadius: 16, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 12 },
-  demo: { borderLeftWidth: 4, paddingLeft: 12, paddingVertical: 4 },
-  demoText: { fontSize: 14, lineHeight: 20 },
-  demoTitle: { fontWeight: "600" },
+  bodyContent: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8, gap: 12 },
+  reading: { flexGrow: 1, gap: 8 },
+  headline: { fontSize: 32, lineHeight: 40 },
+  body16: { fontSize: 16, lineHeight: 24 },
+  small: { fontSize: 14, lineHeight: 20 },
+  medium: { fontWeight: "500" },
+  strong: { fontWeight: "700" },
+  notice: { flexDirection: "row", gap: 8, borderRadius: 12, padding: 12 },
+  grow: { flex: 1 },
+  shrink: { flexShrink: 1 },
   controls: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  // Selector segmentado: si con letra grande no cabe en una fila, sus opciones bajan a otra sin recortarse.
-  segments: { flexDirection: "row", flexWrap: "wrap", flexShrink: 1, borderRadius: 12, borderWidth: 1 },
-  segment: {
+  languages: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  // Opción de idioma discreta: solo texto, con un subrayado transparente que se colorea en la elegida.
+  language: {
     minHeight: 48,
     minWidth: 48,
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
   },
-  segmentFirst: { borderTopLeftRadius: 11, borderBottomLeftRadius: 11 },
-  segmentNext: { borderLeftWidth: 1 },
-  segmentLast: { borderTopRightRadius: 11, borderBottomRightRadius: 11 },
-  segmentText: { fontSize: 16, lineHeight: 24, fontWeight: "500" },
-  segmentSelected: { fontWeight: "700" },
   // El estado ocupa el hueco junto al selector y parte su texto; si quedan menos de 120 px (letra grande),
   // baja a otra fila en vez de solaparse con el selector.
   statusRow: {
@@ -342,36 +353,58 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 4,
   },
-  shrink: { flexShrink: 1 },
-  status: { fontSize: 16, lineHeight: 24, fontWeight: "500" },
-  received: { fontSize: 28, lineHeight: 36 },
-  said: { fontSize: 16, lineHeight: 24 },
-  notice: { flexDirection: "row", gap: 8, borderRadius: 12, padding: 12 },
-  noticeText: { fontSize: 16, lineHeight: 24 },
-  grow: { flex: 1 },
-  // «Cancelar» comparte fila mientras el botón principal tenga al menos 200 px; con letra ampliada baja a otra
-  // fila a todo el ancho, sin reducir ni ocultar textos.
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
-  primary: {
-    flexGrow: 3,
-    flexBasis: 200,
-    minHeight: 64,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 16,
+  // «Cancelar» al principio de la fila y el micrófono al final; con letra grande cada uno puede bajar de fila.
+  actions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
-  primaryText: { fontSize: 18, lineHeight: 24, fontWeight: "600", textAlign: "center" },
-  secondary: {
-    flexGrow: 1,
+  cancel: {
     minHeight: 48,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 24,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  secondaryText: { fontSize: 18, lineHeight: 24, fontWeight: "600" },
+  // Botón principal: etiqueta corta + círculo de 64; el nombre accesible completo va en aria-label.
+  mic: {
+    marginLeft: "auto",
+    flexShrink: 1,
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 12,
+    borderRadius: 32,
+  },
+  label: { fontSize: 18, lineHeight: 24, fontWeight: "600", textAlign: "right" },
+  circle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  micIcon: { alignItems: "center" },
+  micHead: { width: 12, height: 20, borderRadius: 6 },
+  micCradle: {
+    width: 20,
+    height: 12,
+    marginTop: -6,
+    borderWidth: 2,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+  },
+  micStem: { width: 2, height: 5 },
+  stopIcon: { width: 20, height: 20, borderRadius: 3 },
+  waitIcon: { flexDirection: "row", gap: 4 },
+  waitDot: { width: 6, height: 6, borderRadius: 3 },
   pressed: { opacity: 0.85 },
 });

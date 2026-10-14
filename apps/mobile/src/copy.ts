@@ -19,10 +19,14 @@ interface Copy {
   readonly languageGroup: string;
   readonly demoBanner: string;
   readonly noAudio: string;
+  readonly emptyTitle: string;
   readonly empty: string;
   readonly youSaid: string;
   readonly cancel: string;
+  /** Nombre accesible completo del botón principal (se le añade el idioma). */
   readonly button: Readonly<Record<ButtonKey, string>>;
+  /** Etiqueta visible junto al micrófono: corta y contenida en el nombre completo. */
+  readonly buttonShort: Readonly<Record<ButtonKey, string>>;
   readonly status: Readonly<Record<StatusKey, string>>;
   readonly notices: Readonly<Partial<Record<ErrorCode, string>>>;
   readonly noticeFallback: string;
@@ -34,6 +38,7 @@ export const COPY: Readonly<Record<UiLanguage, Copy>> = {
     languageGroup: "Idioma",
     demoBanner: "DEMO: traducción simulada, no real",
     noAudio: "No usa el micrófono ni reproduce audio.",
+    emptyTitle: "Tu traducción",
     empty: "Conversación de ejemplo: toca el botón y verás una frase traducida en la otra mitad.",
     youSaid: "Dijiste:",
     cancel: "Cancelar",
@@ -45,6 +50,15 @@ export const COPY: Readonly<Record<UiLanguage, Copy>> = {
       stopVoice: "Detener voz simulada",
       stopping: "Deteniendo…",
       wait: "Espera: habla la otra persona",
+    },
+    buttonShort: {
+      start: "Hablar",
+      preparing: "Preparando…",
+      finish: "Terminar",
+      translating: "Traduciendo…",
+      stopVoice: "Detener",
+      stopping: "Deteniendo…",
+      wait: "Espera",
     },
     status: {
       ready: "Listo",
@@ -72,6 +86,7 @@ export const COPY: Readonly<Record<UiLanguage, Copy>> = {
     languageGroup: "Language",
     demoBanner: "DEMO: simulated translation, not real",
     noAudio: "It doesn't use the microphone or play audio.",
+    emptyTitle: "Your translation",
     empty: "Example conversation: tap the button to see a translated phrase on the other half.",
     youSaid: "You said:",
     cancel: "Cancel",
@@ -83,6 +98,15 @@ export const COPY: Readonly<Record<UiLanguage, Copy>> = {
       stopVoice: "Stop simulated voice",
       stopping: "Stopping…",
       wait: "Wait: the other person is speaking",
+    },
+    buttonShort: {
+      start: "Speak",
+      preparing: "Getting ready…",
+      finish: "Finish",
+      translating: "Translating…",
+      stopVoice: "Stop",
+      stopping: "Stopping…",
+      wait: "Wait",
     },
     status: {
       ready: "Ready",
