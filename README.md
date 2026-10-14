@@ -2,9 +2,10 @@
 
 Traductor cara a cara por turnos: dos personas comparten un teléfono y cada una usa su mitad de la pantalla.
 
-Estado actual: **interfaz DEMO** en `apps/mobile` (Expo SDK 57). La escucha, la traducción y la voz son simuladas:
-no usa micrófono ni audio, red, cuentas ni servicios. La extensión de Chrome, el servidor y la inferencia real
-llegan en bloques posteriores.
+Estado actual: **interfaz DEMO** en `apps/mobile` (Expo SDK 57). En web, «Hablar» graba audio local real del
+micrófono (getUserMedia + MediaRecorder) y se puede volver a escuchar; el audio no sale del dispositivo y no se
+traduce. En nativo la escucha, la traducción y la voz siguen simuladas. No usa red, cuentas ni servicios. La extensión
+de Chrome, el servidor y la inferencia real llegan en bloques posteriores.
 
 ## Estructura
 
@@ -39,8 +40,9 @@ Runtime: Node 24.16.0 y pnpm 10.34.6. Parámetros de Pages: [guía de despliegue
 ## Modo DEMO
 
 - Marca DEMO visible (cabecera en el teléfono, pie en escritorio) y, en cada panel vacío, «Demo: sin audio ni
-  traducción real.». Diseño en [DESIGN.md](DESIGN.md): teléfono 50/50 con B girada, escritorio con paneles lado a
-  lado y vista «Cara a cara» opcional; paleta marino/blanco fija aunque el sistema use tema oscuro.
+  traducción real.» (en web: «Graba audio en este dispositivo; la traducción aún no está disponible.»). Diseño en
+  [DESIGN.md](DESIGN.md): la disposición es automática, teléfono 50/50 con B girada (también en horizontal) y
+  escritorio con paneles derechos lado a lado; paleta marino/blanco fija aunque el sistema use tema oscuro.
 - Dos toques: el primero inicia una escucha simulada y el segundo la termina. Después, quien habló ve su frase y la
   otra mitad la traducción de ejemplo, ambas marcadas `[DEMO]`, con el estado «voz simulada» (sin audio), que se puede
   detener.

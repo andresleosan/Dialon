@@ -46,40 +46,42 @@ autónimos `#73809A` → `#626D83`). Mínimos medidos con la fórmula WCAG: **te
 
 - Fuente del sistema, sin fuentes descargadas. No se limita el escalado de letra: si el contenido no cabe, el cuerpo
   de lectura de cada panel se desplaza y los controles quedan anclados.
-- Teléfono (≤700 px): cabecera de 52; paneles con márgenes de 8, radio 17 y relleno 22/20/18; título vacío 29/35,
+- Teléfono: cabecera de 52; paneles con márgenes de 8, radio 17 y relleno 22/20/18; título vacío 29/35,
   frase recibida 30/35, cejas 9 y guía 12/18; selector de 216×58 y micrófono de 60.
-- Escritorio (>700 px): lienzo de 1320 como máximo con márgenes de 32, cabecera de 88; paneles iguales de 620×552 a
+- Teléfono en horizontal: mismas mitades 50/50 con medidas compactas (relleno 10/20/8, título vacío 20/25, selector
+  de alto 48 y micrófono de 48), «Cancelar» junto al micrófono y los controles dentro del cuerpo desplazable.
+- Escritorio: lienzo de 1320 como máximo con márgenes de 32, cabecera de 88; paneles iguales de 620×552 a
   1440×900, separación 16, radio 22 y relleno 32; frase 42/50, título vacío 34/41, cejas 11; selector de 170×60 y
   micrófono de 64.
-- Ningún control mide menos de 48 dp: el cierre del selector dibuja un círculo de 32 dentro de una zona de 48 y los
-  botones Escritorio/Cara a cara miden 48 (la maqueta tenía 38).
+- Ningún control mide menos de 48 dp: el cierre del selector dibuja un círculo de 32 dentro de una zona de 48.
 
 ## Disposiciones
 
 ```
-Teléfono (cara a cara 50/50)            Escritorio (por defecto)
+Teléfono (cara a cara 50/50)            Escritorio
 ┌───────────────────────────────────┐   ┌────────────────────────────────────────────┐
 │ dialon  Cara a cara · 50/50  DEMO │   │ dialon                             DEMO    │
-├───────────────────────────────────┤   │ Conversación  [Escritorio | Cara a cara]   │
+├───────────────────────────────────┤   │ Conversación                               │
 │ B marino, girada 180°             │   │ [ B marino, derecha ] [ A blanca, derecha ]│
-├───────────────────────────────────┤   │ DEMO  Frases de ejemplo. Sin micrófono…    │
+├───────────────────────────────────┤   │ DEMO  Audio local en este navegador…       │
 │ A blanca, derecha                 │   └────────────────────────────────────────────┘
 └───────────────────────────────────┘
 ```
 
 - **Teléfono:** área útil en dos mitades exactamente iguales; B arriba con todo su panel girado 180° y A abajo.
 - **Escritorio:** dos paneles iguales lado a lado, ambos derechos: B a la izquierda y A a la derecha. Pie discreto:
-  «DEMO · Frases de ejemplo. Sin micrófono, audio ni traducción real.».
-- **Escritorio «Cara a cara»:** selección explícita que muestra la vista del teléfono centrada (365×600) con dos mitades
-  iguales y B girada; a la izquierda, «Un teléfono compartido» solo si cabe sin tocarla.
+  «DEMO · Audio local en este navegador. Sin traducción real todavía.».
+- **Sin selector manual:** la disposición se elige sola y nunca solo por el ancho. Nativo: teléfono. Web: teléfono si
+  el navegador se declara móvil o, sin pista, si es táctil (`pointer: coarse`) con el lado corto ≤700; si no,
+  escritorio, aunque se estreche la ventana. Un teléfono en horizontal sigue siendo cara a cara.
 - A va primero en el árbol accesible en todas las disposiciones (en escritorio se dibuja con `row-reverse`).
-- La vista solo cambia en reposo. Al redimensionar, el turno sigue intacto (el estado vive por encima de la
-  disposición) y un selector abierto se cierra en vez de quedar donde ya no está su botón.
+- Al girar o redimensionar, el turno sigue intacto (el estado vive por encima de la disposición) y un selector
+  abierto se cierra en vez de quedar donde ya no está su botón.
 
 ## Panel de cada persona
 
 1. Arriba: insignia con la letra, «PERSONA A» / «PERSON B» y el estado con icono (✓ Listo, ● Escucha simulada…). En
-   el teléfono y en el marco cara a cara esta fila es el inicio del cuerpo desplazable (misma posición a escala 1);
+   el teléfono esta fila es el inicio del cuerpo desplazable (misma posición a escala 1);
    así, con letra grande, no le quita alto a la lectura.
 2. Cuerpo de lectura desplazable:
    - vacío: ceja «Tu traducción», título «Habla y lee / la traducción.», guía «Toca Hablar. Toca de nuevo para
@@ -117,7 +119,7 @@ Aparecen en la mitad que indica la máquina de estados, con «!» y texto, y des
 
 | Código | Español | English |
 |---|---|---|
-| `MIC_PERMISSION_DENIED` | Dialon necesita el micrófono. Actívalo en Ajustes. | Dialon needs the microphone. Turn it on in Settings. |
+| `MIC_PERMISSION_DENIED` | Web: Permite el micrófono en el navegador para grabar. | Web: Allow the microphone in your browser to record. |
 | `TOO_SHORT` | Muy corto. Toca, habla y vuelve a tocar. | Too short. Tap, speak, then tap again. |
 | `NO_SPEECH` | No se oyó nada. Inténtalo de nuevo. | Nothing was heard. Try again. |
 | `SERVICE_UNAVAILABLE` | El traductor no está disponible ahora. | The translator isn't available right now. |
@@ -162,7 +164,7 @@ Aparecen en la mitad que indica la máquina de estados, con «!» y texto, y des
 |---|---|---|
 | Paleta fija marino/blanco aunque el sistema pida oscuro | `theme.ts` | prueba de componente + QA web en tema oscuro |
 | Teléfono: mitades iguales, B girada 180°, A primero | `FaceToFaceScreen` | prueba de componente + QA web 360×640 y 393×852 |
-| Escritorio: B izquierda y A derecha, ambas derechas; «Cara a cara» explícito | `FaceToFaceScreen` | prueba de componente + QA web 1440×900 |
+| Disposición automática sin selector: escritorio derecho (B izquierda, A derecha); teléfono 50/50 con B girada también en horizontal | `FaceToFaceScreen` | pruebas de componente (escritorio, redimensionar, vertical/horizontal, pistas web) + QA web 1440×900 |
 | Selector por persona, buscable, cierre por botón/fondo/atrás/Escape | `LanguagePicker` | pruebas de componente + QA de foco web |
 | Sin intercambio; par igual o por validar bloquea los dos «Hablar» | `useDemoConversation` | pruebas del controlador y de pantalla |
 | Idiomas congelados durante el turno | `useDemoConversation` + selectores | pruebas por fase (preparar, escuchar, traducir, voz) |

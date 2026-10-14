@@ -13,22 +13,54 @@ import {
   type TextStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CHROME, COPY, uiLanguageOf, type ButtonKey, type Language, type PairIssue, type StatusKey } from "../copy";
+import type { LocalAudio } from "../audio/capture";
+import {
+  CHROME,
+  COPY,
+  clipSummary,
+  uiLanguageOf,
+  withLocalAudio,
+  type ButtonKey,
+  type Language,
+  type PairIssue,
+  type StatusKey,
+} from "../copy";
 import { BrandBars, Icon, MicGlyph } from "../icons";
 import { COLORS, PANELS } from "../theme";
-import { useDemoConversation } from "../useDemoConversation";
+import { useDemoConversation, type LocalClip, type Playback } from "../useDemoConversation";
 import { LanguagePicker, type Rect } from "./LanguagePicker";
 
 export interface FaceToFaceScreenProps {
   /** Genera un UUID v4 por turno (en la app, `randomUUID` de expo-crypto). */
   readonly createRequestId: () => string;
+  /** Web: grabación y reproducción locales reales. Sin él (nativo), la conversación es la DEMO simulada. */
+  readonly audio?: LocalAudio;
 }
 
-/** Hasta este ancho la pantalla es un teléfono compartido; con más, escritorio. */
-const DESKTOP_MIN_WIDTH = 700;
+/** Lado corto máximo de una pantalla táctil que, sin otra pista del navegador, se trata como teléfono. */
+const PHONE_MAX_SHORT_SIDE = 700;
 
-/** `phone`: cara a cara a pantalla completa. `desktop`: paneles lado a lado. `frame`: cara a cara centrado en escritorio. */
-type Layout = "phone" | "desktop" | "frame";
+/** `phone` / `landscape`: teléfono compartido cara a cara, en vertical u horizontal. `desktop`: paneles lado a lado. */
+type Layout = "phone" | "landscape" | "desktop";
+
+/** Pistas del navegador; ninguna existe en nativo. */
+interface WebHints {
+  readonly navigator?: { readonly userAgent?: string; readonly userAgentData?: { readonly mobile?: boolean } };
+  readonly matchMedia?: (query: string) => { readonly matches: boolean };
+}
+
+/**
+ * Teléfono compartido o escritorio, nunca solo por el ancho. Nativo: siempre teléfono. Web: teléfono si el navegador
+ * se declara móvil o, sin pista, si es una pantalla táctil pequeña en cualquier orientación. Un navegador de
+ * escritorio con ratón sigue en escritorio aunque se estreche la ventana.
+ */
+function isPhoneDevice(width: number, height: number): boolean {
+  if (Platform.OS !== "web") return true;
+  const web = globalThis as WebHints;
+  const agent = web.navigator?.userAgent ?? "";
+  if (web.navigator?.userAgentData?.mobile === true || /Android.+Mobile|iPhone|iPod/i.test(agent)) return true;
+  return web.matchMedia?.("(pointer: coarse)").matches === true && Math.min(width, height) <= PHONE_MAX_SHORT_SIDE;
+}
 
 // El icono acompaña al texto de estado: el color nunca es la única señal.
 const STATUS_ICON: Readonly<Record<Exclude<StatusKey, "ready">, string>> = {
@@ -149,20 +181,25 @@ const SIZES: Readonly<Record<Layout, Sizes>> = {
     mic: 60,
     micIcon: 27,
   },
-  frame: {
+  // Teléfono en horizontal: cada mitad es baja, así que todo es más compacto y los controles se desplazan con el cuerpo.
+  landscape: {
     ...COMPACT,
-    padTop: 20,
+    padTop: 10,
     padX: 20,
-    padBottom: 20,
-    radius: 16,
-    readingTop: 22,
-    phrase: { fontSize: 28, lineHeight: 34, letterSpacing: -0.6 },
-    empty: { fontSize: 28, lineHeight: 34, letterSpacing: -0.6 },
-    bottomTop: 13,
-    selectorWidth: 190,
-    selectorHeight: 54,
-    mic: 54,
-    micIcon: 25,
+    padBottom: 8,
+    radius: 14,
+    readingTop: 8,
+    readingBottom: 8,
+    eyebrowGap: 6,
+    noteGap: 6,
+    phrase: { fontSize: 22, lineHeight: 27, letterSpacing: -0.4 },
+    empty: { fontSize: 20, lineHeight: 25, letterSpacing: -0.4 },
+    bottomTop: 8,
+    selectorWidth: 216,
+    selectorHeight: 48,
+    mic: 48,
+    micIcon: 22,
+    labelGap: 4,
   },
 };
 
@@ -200,9 +237,11 @@ function describeHalf(state: ConversationState, participant: Participant, pairIs
     }
     case "PREPARING": {
       const own = state.turn.participant === participant;
+      // «Cancelar» ya en PREPARING: el permiso del micrófono puede quedarse esperando.
       return {
         ...reading,
-        ...quiet,
+        listening: false,
+        showCancel: own,
         status: own ? "preparing" : "otherSpeaking",
         button: own ? "preparing" : "wait",
         buttonDisabled: true,
@@ -249,10 +288,17 @@ interface HalfProps {
   readonly pairIssue?: PairIssue;
   readonly locked: boolean;
   readonly layout: Layout;
+  /** Con audio local los textos dicen que se graba de verdad y que la traducción está pendiente. */
+  readonly local: boolean;
+  /** Clip local de esta persona, si lo hay. */
+  readonly clip?: LocalClip;
+  readonly playback: Playback;
   readonly selectorRef: (node: View | null) => void;
   readonly onPress: () => void;
   readonly onCancel: () => void;
   readonly onOpenPicker: () => void;
+  readonly onPlay: () => void;
+  readonly onStopPlayback: () => void;
 }
 
 function ConversationHalf({
@@ -262,15 +308,25 @@ function ConversationHalf({
   pairIssue,
   locked,
   layout,
+  local,
+  clip,
+  playback,
   selectorRef,
   onPress,
   onCancel,
   onOpenPicker,
+  onPlay,
+  onStopPlayback,
 }: HalfProps) {
   const panel = PANELS[participant];
   const size = SIZES[layout];
   const desktop = layout === "desktop";
-  const copy = COPY[uiLanguageOf(participant, language)];
+  const landscape = layout === "landscape";
+  // «Cancelar» va junto al micrófono si hay ancho de sobra; en el teléfono vertical, en su propia fila encima.
+  const inlineCancel = desktop || landscape;
+  const baseCopy = COPY[uiLanguageOf(participant, language)];
+  const copy = local ? withLocalAudio(baseCopy) : baseCopy;
+  const playing = playback === "playing";
   const languageName = copy.languageNames[language];
   const named = (label: string) => `${label}, ${languageName}`;
   const notice = view.notice && (copy.notices[view.notice] ?? copy.noticeFallback);
@@ -331,7 +387,7 @@ function ConversationHalf({
       onPress={onCancel}
       style={({ pressed }) => [
         styles.cancel,
-        !desktop && styles.cancelRow,
+        !inlineCancel && styles.cancelRow,
         focus,
         { borderColor: panel.apagado },
         pressed && styles.pressed,
@@ -339,6 +395,93 @@ function ConversationHalf({
     >
       <Text style={[styles.cancelText, { color: panel.texto }]}>{copy.cancel}</Text>
     </Pressable>
+  );
+
+  const controls = (
+    <View style={[styles.bottom, { borderTopColor: panel.linea, paddingTop: size.bottomTop }]}>
+      {!inlineCancel && cancelButton}
+      <View style={styles.controls}>
+        {desktop && (
+          <Text style={[styles.listenNote, note, { lineHeight: 17 }]}>
+            {locked ? copy.languageLocked : copy.listenNote}
+          </Text>
+        )}
+        <View style={[styles.cluster, !desktop && styles.clusterFull]}>
+          <Pressable
+            ref={selectorRef}
+            role="button"
+            aria-label={`${copy.iSpeak}: ${languageName}`}
+            disabled={locked}
+            onPress={onOpenPicker}
+            style={({ pressed }) => [
+              styles.selector,
+              focus,
+              {
+                width: size.selectorWidth,
+                minHeight: size.selectorHeight,
+                paddingHorizontal: size.selectorPadX,
+                backgroundColor: panel.selectorFondo,
+                borderColor: panel.selectorBorde,
+              },
+              locked && styles.dimmed,
+              locked && !desktop && styles.selectorLocked,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.shrink}>
+              <Text
+                style={[
+                  styles.upper,
+                  styles.caption,
+                  { color: panel.texto, fontSize: size.caption, lineHeight: size.caption + 3 },
+                ]}
+              >
+                {copy.iSpeak}
+              </Text>
+              <Text style={[styles.value, { color: panel.texto, fontSize: size.value, lineHeight: size.value + 4 }]}>
+                {languageName}
+              </Text>
+            </View>
+            {!locked && <Icon name="chevron" size={20} color={panel.texto} />}
+          </Pressable>
+          {inlineCancel && cancelButton}
+          <Pressable
+            role="button"
+            aria-label={named(copy.button[view.button])}
+            disabled={view.buttonDisabled}
+            onPress={onPress}
+            style={({ pressed }) => [styles.speak, { gap: size.labelGap }, focus, pressed && styles.pressed]}
+          >
+            <View style={{ width: size.mic, height: size.mic }}>
+              <View
+                style={[
+                  styles.ring,
+                  { width: size.mic + 14, height: size.mic + 14, borderRadius: (size.mic + 14) / 2 },
+                  { backgroundColor: panel.anillo },
+                ]}
+              />
+              <View
+                style={[
+                  styles.circle,
+                  { borderRadius: size.mic / 2, backgroundColor: circle.background, borderColor: circle.border },
+                ]}
+              >
+                <MicGlyph shape={shape} size={size.micIcon} color={circle.icon} />
+              </View>
+            </View>
+            <Text
+              style={[
+                styles.strong,
+                styles.centered,
+                { color: view.buttonDisabled ? panel.nota : panel.texto, fontSize: size.label, lineHeight: size.label + 4 },
+              ]}
+            >
+              {copy.buttonShort[view.button]}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
   );
 
   return (
@@ -360,9 +503,16 @@ function ConversationHalf({
       {desktop && topRow}
 
       {/* Cuerpo de lectura propio y desplazable: con letra grande todo se lee entero haciendo scroll. */}
-      <ScrollView testID={`cuerpo-${participant}`} style={styles.body} contentContainerStyle={styles.grow}>
+      {/* En horizontal el contenido crece a su altura natural y se desplaza: lectura y controles no se encogen encima. */}
+      <ScrollView
+        testID={`cuerpo-${participant}`}
+        style={styles.body}
+        contentContainerStyle={landscape ? styles.scrollContent : styles.grow}
+      >
         {!desktop && topRow}
-        <View style={[styles.grow, { paddingTop: size.readingTop, paddingBottom: size.readingBottom }]}>
+        <View
+          style={[landscape ? styles.natural : styles.grow, { paddingTop: size.readingTop, paddingBottom: size.readingBottom }]}
+        >
           <Text
             style={[
               styles.strong,
@@ -376,13 +526,44 @@ function ConversationHalf({
               },
             ]}
           >
-            {view.received !== undefined
-              ? copy.receivedEyebrow
-              : view.said !== undefined
-                ? copy.saidEyebrow
-                : copy.emptyEyebrow}
+            {clip !== undefined
+              ? copy.local.clipEyebrow
+              : view.received !== undefined
+                ? copy.receivedEyebrow
+                : view.said !== undefined
+                  ? copy.saidEyebrow
+                  : copy.emptyEyebrow}
           </Text>
-          {reading !== undefined ? (
+          {clip !== undefined ? (
+            <>
+              <Text style={[styles.phrase, { color: panel.texto }, size.empty]}>
+                {clipSummary(copy, clip.info.durationMs, clip.info.byteLength)}
+              </Text>
+              <Text style={[note, { marginTop: size.noteGap }]}>{copy.local.clipNote}</Text>
+              {/* Reproducción solo a mano y solo de este clip local. */}
+              <Pressable
+                role="button"
+                aria-label={named(playing ? copy.local.stopPlayback : copy.local.replay)}
+                onPress={playing ? onStopPlayback : onPlay}
+                style={({ pressed }) => [
+                  styles.cancel,
+                  styles.clipButton,
+                  focus,
+                  { borderColor: panel.apagado },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.cancelText, { color: panel.texto }]}>
+                  {playing ? copy.local.stopPlayback : copy.local.replay}
+                </Text>
+              </Pressable>
+              {playback === "failed" && (
+                <Text role="alert" style={[note, styles.clipFailed]}>
+                  {copy.local.playFailed}
+                </Text>
+              )}
+            </>
+          ) : reading !== undefined ? (
             <>
               <Text
                 aria-live={view.received !== undefined ? "polite" : undefined}
@@ -416,93 +597,11 @@ function ConversationHalf({
           )}
           {locked && !desktop && <Text style={[note, styles.lockedNote]}>{copy.languageLocked}</Text>}
         </View>
+        {landscape && controls}
       </ScrollView>
 
-      {/* Controles anclados fuera del cuerpo: idioma, «Cancelar» si aplica y micrófono con su etiqueta. */}
-      <View style={[styles.bottom, { borderTopColor: panel.linea, paddingTop: size.bottomTop }]}>
-        {!desktop && cancelButton}
-        <View style={styles.controls}>
-          {desktop && (
-            <Text style={[styles.listenNote, note, { lineHeight: 17 }]}>
-              {locked ? copy.languageLocked : copy.listenNote}
-            </Text>
-          )}
-          <View style={[styles.cluster, !desktop && styles.clusterFull]}>
-            <Pressable
-              ref={selectorRef}
-              role="button"
-              aria-label={`${copy.iSpeak}: ${languageName}`}
-              disabled={locked}
-              onPress={onOpenPicker}
-              style={({ pressed }) => [
-                styles.selector,
-                focus,
-                {
-                  width: size.selectorWidth,
-                  minHeight: size.selectorHeight,
-                  paddingHorizontal: size.selectorPadX,
-                  backgroundColor: panel.selectorFondo,
-                  borderColor: panel.selectorBorde,
-                },
-                locked && styles.dimmed,
-                locked && !desktop && styles.selectorLocked,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={styles.shrink}>
-                <Text
-                  style={[
-                    styles.upper,
-                    styles.caption,
-                    { color: panel.texto, fontSize: size.caption, lineHeight: size.caption + 3 },
-                  ]}
-                >
-                  {copy.iSpeak}
-                </Text>
-                <Text style={[styles.value, { color: panel.texto, fontSize: size.value, lineHeight: size.value + 4 }]}>
-                  {languageName}
-                </Text>
-              </View>
-              {!locked && <Icon name="chevron" size={20} color={panel.texto} />}
-            </Pressable>
-            {desktop && cancelButton}
-            <Pressable
-              role="button"
-              aria-label={named(copy.button[view.button])}
-              disabled={view.buttonDisabled}
-              onPress={onPress}
-              style={({ pressed }) => [styles.speak, { gap: size.labelGap }, focus, pressed && styles.pressed]}
-            >
-              <View style={{ width: size.mic, height: size.mic }}>
-                <View
-                  style={[
-                    styles.ring,
-                    { width: size.mic + 14, height: size.mic + 14, borderRadius: (size.mic + 14) / 2 },
-                    { backgroundColor: panel.anillo },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.circle,
-                    { borderRadius: size.mic / 2, backgroundColor: circle.background, borderColor: circle.border },
-                  ]}
-                >
-                  <MicGlyph shape={shape} size={size.micIcon} color={circle.icon} />
-                </View>
-              </View>
-              <Text
-                style={[
-                  styles.strong,
-                  styles.centered,
-                  { color: view.buttonDisabled ? panel.nota : panel.texto, fontSize: size.label, lineHeight: size.label + 4 },
-                ]}
-              >
-                {copy.buttonShort[view.button]}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
+      {/* Controles anclados fuera del cuerpo, salvo en horizontal, donde se desplazan con él para no quedar cortados. */}
+      {!landscape && controls}
     </View>
   );
 }
@@ -529,19 +628,19 @@ interface PickerState {
  * dos paneles derechos lado a lado (B a la izquierda) o, al elegir «Cara a cara», la vista del teléfono centrada.
  * A va siempre primero en el árbol accesible.
  */
-export function FaceToFaceScreen({ createRequestId }: FaceToFaceScreenProps) {
-  const { width } = useWindowDimensions();
+export function FaceToFaceScreen({ createRequestId, audio }: FaceToFaceScreenProps) {
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { state, languages, pairIssue, press, cancel, selectLanguage } = useDemoConversation(createRequestId);
-  const [desktopView, setDesktopView] = useState<"desktop" | "frame">("desktop");
+  const { state, languages, pairIssue, press, cancel, selectLanguage, clip, playback, play, stopPlayback } =
+    useDemoConversation(createRequestId, audio);
   const [picker, setPicker] = useState<PickerState>();
   const selectors = useRef<Partial<Record<Participant, View | null>>>({});
   const locked = state.status !== "IDLE";
-  const layout: Layout = width > DESKTOP_MIN_WIDTH ? desktopView : "phone";
+  const layout: Layout = !isPhoneDevice(width, height) ? "desktop" : width > height ? "landscape" : "phone";
 
   // Si cambia la geometría o empieza un turno, el selector abierto se cierra (y no reaparece al volver).
   const pickerStale =
-    picker !== undefined && (picker.layout !== layout || (layout !== "phone" && picker.width !== width) || locked);
+    picker !== undefined && (picker.layout !== layout || (layout === "desktop" && picker.width !== width) || locked);
   if (pickerStale) setPicker(undefined);
   const openPicker = pickerStale ? undefined : picker;
 
@@ -569,6 +668,11 @@ export function FaceToFaceScreen({ createRequestId }: FaceToFaceScreenProps) {
       pairIssue={pairIssue}
       locked={locked}
       layout={layout}
+      local={audio !== undefined}
+      clip={clip?.participant === participant ? clip : undefined}
+      playback={playback}
+      onPlay={play}
+      onStopPlayback={stopPlayback}
       selectorRef={(node) => {
         selectors.current[participant] = node;
       }}
@@ -587,7 +691,7 @@ export function FaceToFaceScreen({ createRequestId }: FaceToFaceScreenProps) {
       participant={openPicker.participant}
       copy={COPY[uiLanguageOf(openPicker.participant, languages[openPicker.participant])]}
       current={languages[openPicker.participant]}
-      variant={layout === "phone" ? "sheet" : "popover"}
+      variant={layout === "desktop" ? "popover" : "sheet"}
       rotated={openPicker.participant === "B" && layout !== "desktop"}
       anchor={openPicker.anchor}
       onSelect={(language) => {
@@ -598,7 +702,7 @@ export function FaceToFaceScreen({ createRequestId }: FaceToFaceScreenProps) {
     />
   );
 
-  if (layout === "phone") {
+  if (layout !== "desktop") {
     return (
       <View testID="pantalla" style={styles.screen}>
         {/* Mientras el selector está abierto, el resto queda fuera del árbol accesible. */}
@@ -632,9 +736,6 @@ export function FaceToFaceScreen({ createRequestId }: FaceToFaceScreenProps) {
     );
   }
 
-  // El pie del marco cara a cara solo se muestra si cabe a la izquierda del teléfono sin tocarlo.
-  const canvasWidth = Math.min(width, 1320) - 64;
-  const showCaption = (canvasWidth - FRAME_WIDTH) / 2 >= 246;
   return (
     <View testID="pantalla" style={styles.screen}>
       <ScrollView
@@ -659,60 +760,20 @@ export function FaceToFaceScreen({ createRequestId }: FaceToFaceScreenProps) {
             </Text>
             <Text style={styles.subtitle}>{CHROME.subtitle}</Text>
           </View>
-          {/* La vista solo cambia en reposo: la geometría no se mueve a mitad de un turno. */}
-          <View role="radiogroup" aria-label={locked ? CHROME.viewLocked : CHROME.view} style={[styles.row, styles.modes]}>
-            {(["desktop", "frame"] as const).map((option) => {
-              const selected = desktopView === option;
-              const color = selected ? COLORS.tinta : COLORS.vistaTexto;
-              return (
-                <Pressable
-                  key={option}
-                  role="radio"
-                  aria-checked={selected}
-                  disabled={locked}
-                  onPress={() => {
-                    setDesktopView(option);
-                  }}
-                  style={[styles.mode, selected && styles.modeSelected, locked && styles.dimmed]}
-                >
-                  <Icon name={option === "desktop" ? "monitor" : "phone"} size={17} color={color} />
-                  <Text style={[styles.modeText, { color }]}>
-                    {option === "desktop" ? CHROME.desktop : CHROME.faceToFace}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
         </View>
 
-        {layout === "desktop" ? (
-          <View testID="conversacion" style={styles.sideBySide}>
-            {half("A")}
-            {half("B")}
-          </View>
-        ) : (
-          <View style={styles.frame}>
-            {showCaption && (
-              <View style={styles.frameCaption}>
-                <Text style={styles.frameCaptionTitle}>{CHROME.sharedPhone}</Text>
-                <Text style={styles.frameCaptionText}>{CHROME.sharedPhoneText}</Text>
-              </View>
-            )}
-            <View testID="conversacion" style={styles.framePhone}>
-              {half("A")}
-              {half("B")}
-            </View>
-          </View>
-        )}
+        <View testID="conversacion" style={styles.sideBySide}>
+          {half("A")}
+          {half("B")}
+        </View>
 
         <View style={styles.footer}>
           <View style={[styles.row, styles.footerDemo]}>
             <View style={styles.demoBadge}>
               <Text style={styles.demoBadgeText}>{CHROME.demo}</Text>
             </View>
-            <Text style={[styles.footerText, styles.shrink]}>{CHROME.footer}</Text>
+            <Text style={[styles.footerText, styles.shrink]}>{audio ? CHROME.footerLocal : CHROME.footer}</Text>
           </View>
-          <Text style={styles.footerText}>{CHROME.footerMode}</Text>
         </View>
       </ScrollView>
       {pickerLayer}
@@ -720,13 +781,14 @@ export function FaceToFaceScreen({ createRequestId }: FaceToFaceScreenProps) {
   );
 }
 
-const FRAME_WIDTH = 365;
-
 const upper: TextStyle = { textTransform: "uppercase" };
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.fondo },
   grow: { flex: 1 },
+  // Llena el alto disponible pero, si el contenido es mayor, crece en vez de encoger sus hijos.
+  scrollContent: { flexGrow: 1 },
+  natural: { flexGrow: 1, flexShrink: 0 },
   row: { flexDirection: "row", alignItems: "center" },
   shrink: { flexShrink: 1 },
   strong: { fontWeight: "700" },
@@ -777,37 +839,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 34, lineHeight: 37, fontWeight: "700", letterSpacing: -1.1, color: COLORS.tinta, marginBottom: 8 },
   subtitle: { fontSize: 15, lineHeight: 18, color: COLORS.apagado },
-  modes: { padding: 4, borderRadius: 12, backgroundColor: COLORS.vistaFondo },
-  mode: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    borderRadius: 9,
-    outlineColor: COLORS.marino,
-  },
-  modeSelected: {
-    backgroundColor: COLORS.blanco,
-    shadowColor: "#18325E",
-    shadowOpacity: 0.09,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-  },
-  modeText: { fontSize: 13, lineHeight: 16, fontWeight: "600" },
   sideBySide: { height: 552, flexDirection: "row-reverse", gap: 16 },
-  frame: { height: 600, borderRadius: 22, backgroundColor: COLORS.marcoFondo, alignItems: "center" },
-  frameCaption: { position: "absolute", top: 240, left: 30, maxWidth: 200 },
-  frameCaptionTitle: { fontSize: 17, lineHeight: 27, fontWeight: "700", color: COLORS.marino, marginBottom: 6 },
-  frameCaptionText: { fontSize: 14, lineHeight: 22, color: COLORS.marcoTexto },
-  framePhone: {
-    width: FRAME_WIDTH,
-    height: 600,
-    padding: 8,
-    gap: 8,
-    flexDirection: "column-reverse",
-    backgroundColor: COLORS.fondo,
-  },
   footer: {
     paddingTop: 25,
     paddingBottom: 24,
@@ -871,6 +903,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cancelText: { fontSize: 14, lineHeight: 18, fontWeight: "600" },
+  clipButton: { alignSelf: "flex-start", marginTop: 14 },
+  clipFailed: { marginTop: 8 },
   speak: { alignItems: "center", borderRadius: 12 },
   ring: { position: "absolute", top: -7, left: -7 },
   circle: { flex: 1, borderWidth: 2, alignItems: "center", justifyContent: "center" },

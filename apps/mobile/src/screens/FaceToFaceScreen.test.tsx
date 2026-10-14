@@ -1,7 +1,13 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
-import { AccessibilityInfo, Dimensions, TextInput, useColorScheme } from "react-native";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react-native";
+import { AccessibilityInfo, Dimensions, Platform, TextInput, useColorScheme } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import type { LocalAudio } from "../audio/capture";
+import { webAudioCapture } from "../audio/webCapture";
+import { webAudioPlayer } from "../audio/webPlayer";
 import { FaceToFaceScreen } from "./FaceToFaceScreen";
+
+// Blob real de Node solo para las pruebas: el Blob del entorno de React Native no guarda bytes.
+const { Blob: NodeBlob } = jest.requireActual<{ Blob: typeof Blob }>("node:buffer");
 
 const METRICS = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -54,10 +60,10 @@ function uuidSequence() {
   });
 }
 
-async function renderScreen(createRequestId: () => string = uuidSequence()) {
+async function renderScreen(createRequestId: () => string = uuidSequence(), audio?: LocalAudio) {
   await render(
     <SafeAreaProvider initialMetrics={METRICS}>
-      <FaceToFaceScreen createRequestId={createRequestId} />
+      <FaceToFaceScreen createRequestId={createRequestId} audio={audio} />
     </SafeAreaProvider>,
   );
   return { halfA: within(screen.getByTestId("mitad-A")), halfB: within(screen.getByTestId("mitad-B")) };
@@ -145,44 +151,139 @@ describe("FaceToFaceScreen DEMO en el móvil: cara a cara 50/50", () => {
   });
 });
 
-describe("FaceToFaceScreen DEMO en escritorio", () => {
-  beforeEach(() => {
-    setViewport(1440, 900);
+/** Navegador de escritorio: web sin pistas de móvil ni puntero táctil (el entorno de pruebas es iOS por defecto). */
+function useDesktopBrowser() {
+  jest.replaceProperty(Platform, "OS", "web");
+}
+
+const ROTATED = { transform: [{ rotate: "180deg" }] };
+
+function expectDesktop() {
+  expect(screen.getByTestId("conversacion")).toHaveStyle({ flexDirection: "row-reverse" });
+  expect(screen.getByTestId("mitad-A")).not.toHaveStyle(ROTATED);
+  expect(screen.getByTestId("mitad-B")).not.toHaveStyle(ROTATED);
+}
+
+function expectFaceToFace() {
+  expect(screen.getByTestId("conversacion")).toHaveStyle({ flexDirection: "column-reverse" });
+  expect(screen.getByTestId("mitad-A")).toHaveStyle({ flex: 1 });
+  expect(screen.getByTestId("mitad-A")).not.toHaveStyle(ROTATED);
+  expect(screen.getByTestId("mitad-B")).toHaveStyle({ flex: 1, ...ROTATED });
+}
+
+describe("FaceToFaceScreen: disposición automática según el dispositivo", () => {
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    Reflect.deleteProperty(globalThis, "matchMedia");
+    if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+    else Reflect.deleteProperty(globalThis, "navigator");
   });
 
-  it("muestra por defecto dos paneles derechos lado a lado: B marino a la izquierda y A blanco a la derecha", async () => {
+  it("en un navegador de escritorio muestra los dos paneles derechos lado a lado, sin selector manual de vista", async () => {
+    useDesktopBrowser();
+    setViewport(1440, 900);
     await renderScreen();
-    expect(screen.getByRole("radio", { name: "Escritorio" })).toBeChecked();
-    expect(screen.getByTestId("conversacion")).toHaveStyle({ flexDirection: "row-reverse" });
-    expect(screen.getByTestId("mitad-A")).not.toHaveStyle({ transform: [{ rotate: "180deg" }] });
-    expect(screen.getByTestId("mitad-B")).not.toHaveStyle({ transform: [{ rotate: "180deg" }] });
+    expectDesktop();
     expect(screen.getByTestId("mitad-B")).toHaveStyle({ backgroundColor: "#12295C" });
     expect(screen.getByTestId("mitad-A")).toHaveStyle({ backgroundColor: "#FFFFFF" });
     expect(screen.getByText("Frases de ejemplo. Sin micrófono, audio ni traducción real.")).toBeOnTheScreen();
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
+    expect(screen.queryAllByRole("radiogroup")).toHaveLength(0);
+    expect(screen.queryByText("Escritorio")).toBeNull();
+    expect(screen.queryByText("Cara a cara")).toBeNull();
   });
 
-  it("«Cara a cara» muestra la vista móvil 50/50 con B girada y «Escritorio» la devuelve", async () => {
+  it("una ventana de escritorio estrecha o apaisada sigue derecha: el ancho solo no la convierte en teléfono", async () => {
+    useDesktopBrowser();
+    setViewport(1440, 900);
     await renderScreen();
-    await fireEvent.press(screen.getByRole("radio", { name: "Cara a cara" }));
-    expect(screen.getByRole("radio", { name: "Cara a cara" })).toBeChecked();
-    expect(screen.getByTestId("conversacion")).toHaveStyle({ flexDirection: "column-reverse" });
-    expect(screen.getByTestId("mitad-B")).toHaveStyle({ flex: 1, transform: [{ rotate: "180deg" }] });
-    expect(screen.getByTestId("mitad-A")).not.toHaveStyle({ transform: [{ rotate: "180deg" }] });
-
-    await fireEvent.press(screen.getByRole("radio", { name: "Escritorio" }));
-    expect(screen.getByTestId("conversacion")).toHaveStyle({ flexDirection: "row-reverse" });
-    expect(screen.getByTestId("mitad-B")).not.toHaveStyle({ transform: [{ rotate: "180deg" }] });
+    for (const [width, height] of [
+      [393, 852],
+      [852, 393],
+      [1440, 900],
+    ] as const) {
+      await act(() => {
+        setViewport(width, height);
+      });
+      expectDesktop();
+    }
   });
 
-  it("al pasar a ancho de móvil se cierra el selector abierto y no reaparece al volver a escritorio", async () => {
+  it("en un teléfono nativo es cara a cara 50/50 con B girada, en vertical y en horizontal, y el turno sobrevive al giro", async () => {
+    setViewport(393, 852);
+    const { halfA } = await renderScreen();
+    expectFaceToFace();
+    await fireEvent.press(halfA.getByRole("button", { name: A.start }));
+
+    await act(() => {
+      setViewport(852, 393);
+    });
+    expectFaceToFace();
+    expect(screen.getByText("Cara a cara · 50/50")).toBeOnTheScreen();
+    expect(within(screen.getByTestId("mitad-A")).getByRole("button", { name: "Preparando…, Español" })).toBeDisabled();
+    expect(within(screen.getByTestId("mitad-A")).getByRole("button", { name: A.cancel })).toBeEnabled();
+  });
+
+  it("en el navegador de un móvil (pista del navegador) el horizontal sigue siendo cara a cara aunque pase de 700 px", async () => {
+    jest.replaceProperty(Platform, "OS", "web");
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148" },
+    });
+    setViewport(852, 393);
+    await renderScreen();
+    expectFaceToFace();
+  });
+
+  it("sin pista, una pantalla táctil pequeña es cara a cara en cualquier orientación; una táctil grande, escritorio", async () => {
+    jest.replaceProperty(Platform, "OS", "web");
+    Object.assign(globalThis, { matchMedia: jest.fn((query: string) => ({ matches: query === "(pointer: coarse)" })) });
+    setViewport(740, 360);
+    await renderScreen();
+    expectFaceToFace();
+    await act(() => {
+      setViewport(360, 740);
+    });
+    expectFaceToFace();
+    await act(() => {
+      setViewport(1366, 1024);
+    });
+    expectDesktop();
+  });
+
+  it("en horizontal cada mitad desplaza también sus controles: Hablar, Terminar y Cancelar siempre se alcanzan", async () => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "queueMicrotask", "setImmediate", "clearImmediate"] });
+    try {
+      setViewport(852, 393);
+      const { halfA, halfB } = await renderScreen();
+      const bodyA = within(screen.getByTestId("cuerpo-A"));
+      const bodyB = within(screen.getByTestId("cuerpo-B"));
+      expect(bodyA.getByRole("button", { name: A.start })).toBeEnabled();
+      expect(bodyA.getByRole("button", { name: A.selector })).toBeEnabled();
+      expect(bodyB.getByRole("button", { name: B.start })).toBeEnabled();
+
+      await fireEvent.press(halfA.getByRole("button", { name: A.start }));
+      await nextDemoStep();
+      expect(bodyA.getByRole("button", { name: A.finish })).toBeEnabled();
+      expect(bodyA.getByRole("button", { name: A.cancel })).toBeEnabled();
+      expect(halfB.getByRole("button", { name: B.wait })).toBeDisabled();
+      expectFaceToFace();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("al cambiar el tamaño de la ventana de escritorio se cierra el selector abierto y no reaparece", async () => {
+    useDesktopBrowser();
+    setViewport(1440, 900);
     await renderScreen();
     await openPicker("A", A.selector);
     await act(() => {
-      setViewport(393, 852);
+      setViewport(1200, 900);
     });
     expect(screen.queryByTestId("selector-A")).toBeNull();
-    expect(screen.getByTestId("mitad-B")).toHaveStyle({ transform: [{ rotate: "180deg" }] });
-
     await act(() => {
       setViewport(1440, 900);
     });
@@ -583,19 +684,6 @@ describe("FaceToFaceScreen DEMO: turnos simulados", () => {
     expect(halfA.getByRole("button", { name: A.finish })).toBeEnabled();
   });
 
-  it("en escritorio no se cambia de vista durante un turno y vuelve a poder cambiarse al terminar", async () => {
-    setViewport(1440, 900);
-    const { halfA } = await renderScreen();
-    await fireEvent.press(halfA.getByRole("button", { name: A.start }));
-    expect(screen.getByRole("radio", { name: "Cara a cara" })).toBeDisabled();
-    await fireEvent.press(screen.getByRole("radio", { name: "Cara a cara" }));
-    expect(screen.getByTestId("conversacion")).toHaveStyle({ flexDirection: "row-reverse" });
-
-    await nextDemoStep();
-    await fireEvent.press(halfA.getByRole("button", { name: A.cancel }));
-    expect(screen.getByRole("radio", { name: "Cara a cara" })).toBeEnabled();
-  });
-
   it("al desmontar en mitad de un turno no queda ningún temporizador pendiente", async () => {
     const { halfA } = await renderScreen();
     await fireEvent.press(halfA.getByRole("button", { name: A.start }));
@@ -618,5 +706,212 @@ describe("FaceToFaceScreen DEMO: turnos simulados", () => {
     expect(createRequestId).toHaveBeenCalledTimes(2);
     expect(halfB.getByText("Something went wrong. Try again.")).toBeOnTheScreen();
     expect(halfB.getByRole("button", { name: B.start })).toBeEnabled();
+  });
+});
+
+/**
+ * Navegador simulado para la ruta web real (webAudioCapture + webAudioPlayer): getUserMedia, MediaRecorder,
+ * <audio> y URLs de Blob. Sin micrófono, altavoz ni red.
+ */
+function installBrowser() {
+  const tracks: { stop: jest.Mock; onended: (() => void) | null }[] = [];
+  const audios: { play: jest.Mock; pause: jest.Mock; onended: (() => void) | null }[] = [];
+  const requests: { resolve: (stream: unknown) => void; reject: (error: unknown) => void }[] = [];
+  const getUserMedia = jest.fn(
+    () =>
+      new Promise((resolve, reject) => {
+        requests.push({ resolve, reject });
+      }),
+  );
+  class Recorder {
+    static isTypeSupported(type: string) {
+      return type === "audio/webm;codecs=opus";
+    }
+    state = "inactive";
+    ondataavailable: ((event: { data: unknown }) => void) | null = null;
+    onstop: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    readonly mimeType: string;
+    constructor(_stream: unknown, options: { mimeType: string }) {
+      this.mimeType = options.mimeType;
+    }
+    start() {
+      this.state = "recording";
+    }
+    stop() {
+      this.state = "inactive";
+      queueMicrotask(() => {
+        this.ondataavailable?.({ data: new NodeBlob([new Uint8Array(41_000)], { type: this.mimeType }) });
+        this.onstop?.();
+      });
+    }
+  }
+  class FakeAudio {
+    onended: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    readonly play = jest.fn(() => Promise.resolve());
+    readonly pause = jest.fn();
+    readonly load = jest.fn();
+    readonly removeAttribute = jest.fn();
+    constructor() {
+      audios.push(this);
+    }
+  }
+  Object.assign(globalThis, {
+    MediaRecorder: Recorder,
+    Blob: NodeBlob,
+    Audio: FakeAudio,
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+  });
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: { mediaDevices: { getUserMedia } } });
+  const createObjectURL = jest.spyOn(URL, "createObjectURL").mockImplementation(() => "blob:dialon/clip");
+  const revokeObjectURL = jest.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  const request = (index: number) => {
+    const found = requests[index];
+    if (!found) throw new Error("no se pidió el micrófono");
+    return found;
+  };
+  return {
+    getUserMedia,
+    tracks,
+    audios,
+    createObjectURL,
+    revokeObjectURL,
+    async grant(index = 0) {
+      const track = { stop: jest.fn(), onended: null };
+      tracks.push(track);
+      await act(async () => {
+        request(index).resolve({ getTracks: () => [track] });
+        await Promise.resolve();
+      });
+    },
+    async deny(index = 0) {
+      await act(async () => {
+        request(index).reject(new DOMException("denegado", "NotAllowedError"));
+        await Promise.resolve();
+      });
+    },
+  };
+}
+
+const WEB_AUDIO: LocalAudio = { capture: webAudioCapture, player: webAudioPlayer };
+const LOCAL_NOTE = {
+  es: "Graba audio en este dispositivo; la traducción aún no está disponible.",
+  en: "Records audio on this device; translation isn't available yet.",
+};
+
+describe("FaceToFaceScreen en web: audio local real", () => {
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const originalBlob = globalThis.Blob;
+
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "queueMicrotask", "setImmediate", "clearImmediate"] });
+    jest.spyOn(performance, "now").mockImplementation(() => Date.now());
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+    // Desmonta antes de retirar el navegador simulado: la limpieza del controlador aún lo usa.
+    await cleanup();
+    for (const name of ["MediaRecorder", "Audio", "addEventListener", "removeEventListener"]) {
+      Reflect.deleteProperty(globalThis, name);
+    }
+    Object.assign(globalThis, { Blob: originalBlob });
+    if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+    else Reflect.deleteProperty(globalThis, "navigator");
+  });
+
+  it("cada mitad explica en su idioma que graba audio local sin traducción, sin la nota DEMO de «sin audio»", async () => {
+    installBrowser();
+    const { halfA, halfB } = await renderScreen(uuidSequence(), WEB_AUDIO);
+    expect(halfA.getByText(LOCAL_NOTE.es)).toBeOnTheScreen();
+    expect(halfB.getByText(LOCAL_NOTE.en)).toBeOnTheScreen();
+    expect(screen.queryByText(DEMO_NOTE.es)).toBeNull();
+    expect(screen.queryByText(DEMO_NOTE.en)).toBeNull();
+    expect(screen.getByTestId("mitad-B")).toHaveStyle({ flex: 1, transform: [{ rotate: "180deg" }] });
+  });
+
+  it("en escritorio el pie dice que el audio es local y que no hay traducción real, sin decir «sin micrófono»", async () => {
+    useDesktopBrowser();
+    setViewport(1440, 900);
+    installBrowser();
+    await renderScreen(uuidSequence(), WEB_AUDIO);
+    expect(screen.getByText("Audio local en este navegador. Sin traducción real todavía.")).toBeOnTheScreen();
+    expect(screen.queryByText(/Sin micrófono/)).toBeNull();
+  });
+
+  it("dos toques graban un clip real: la mitad de A muestra duración y tamaño reales, traducción pendiente y nada inventado", async () => {
+    const browser = installBrowser();
+    const { halfA, halfB } = await renderScreen(uuidSequence(), WEB_AUDIO);
+    await fireEvent.press(halfA.getByRole("button", { name: A.start }));
+    expect(browser.getUserMedia).toHaveBeenCalledWith({ audio: true });
+    expect(halfA.getByRole("button", { name: "Preparando…, Español" })).toBeDisabled();
+    expect(halfA.getByRole("button", { name: A.cancel })).toBeEnabled();
+
+    await browser.grant();
+    expect(halfA.getByText("Grabando")).toBeOnTheScreen();
+    expect(halfB.getByRole("button", { name: B.wait })).toBeDisabled();
+    await speakFor(2500);
+    await fireEvent.press(halfA.getByRole("button", { name: "Grabando: toca para terminar, Español" }));
+    expect(browser.tracks[0]?.stop).toHaveBeenCalled();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(halfA.getByText("Tu audio")).toBeOnTheScreen();
+    expect(halfA.getByText("2,5 s · 40 KB")).toBeOnTheScreen();
+    expect(halfA.getByText("Audio local · traducción pendiente")).toBeOnTheScreen();
+    expect(screen.queryByText(/\[DEMO\]/)).toBeNull();
+    expect(screen.queryByText(/Traduc/)).toBeNull();
+    expect(halfB.getByText(EMPTY.en)).toBeOnTheScreen();
+    expect(halfA.getByRole("button", { name: A.start })).toBeEnabled();
+    expect(halfA.getByRole("button", { name: A.selector })).toBeEnabled();
+    expect(jest.getTimerCount()).toBe(0);
+
+    await fireEvent.press(halfA.getByRole("button", { name: "Escuchar, Español" }));
+    expect(browser.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(browser.audios[0]?.play).toHaveBeenCalled();
+    await fireEvent.press(halfA.getByRole("button", { name: "Detener, Español" }));
+    expect(browser.revokeObjectURL).toHaveBeenCalledWith("blob:dialon/clip");
+    expect(halfA.getByRole("button", { name: "Escuchar, Español" })).toBeEnabled();
+
+    // Otra grabación descarta el clip anterior.
+    await fireEvent.press(halfB.getByRole("button", { name: B.start }));
+    expect(screen.queryByText("Tu audio")).toBeNull();
+    expect(halfB.getByRole("button", { name: "Cancel, English" })).toBeEnabled();
+  });
+
+  it("«Cancelar» mientras se pide el permiso vuelve a «listo» y apaga el micrófono si se concede tarde", async () => {
+    const browser = installBrowser();
+    const { halfA } = await renderScreen(uuidSequence(), WEB_AUDIO);
+    await fireEvent.press(halfA.getByRole("button", { name: A.start }));
+    await fireEvent.press(halfA.getByRole("button", { name: A.cancel }));
+    expect(halfA.getByRole("button", { name: A.start })).toBeEnabled();
+
+    await browser.grant();
+    expect(browser.tracks[0]?.stop).toHaveBeenCalled();
+    expect(halfA.getByRole("button", { name: A.start })).toBeEnabled();
+    expect(screen.queryByText("Grabando")).toBeNull();
+  });
+
+  it("un permiso denegado avisa en la mitad de quien habla y un toque demasiado corto avisa «Muy corto»", async () => {
+    const browser = installBrowser();
+    const { halfA, halfB } = await renderScreen(uuidSequence(), WEB_AUDIO);
+    await fireEvent.press(halfB.getByRole("button", { name: B.start }));
+    await browser.deny();
+    expect(halfB.getByText("Allow the microphone in your browser to record.")).toBeOnTheScreen();
+    expect(screen.queryByText(/Settings/)).toBeNull();
+
+    await fireEvent.press(halfA.getByRole("button", { name: A.start }));
+    await browser.grant(1);
+    await speakFor(100);
+    await fireEvent.press(halfA.getByRole("button", { name: "Grabando: toca para terminar, Español" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(halfA.getByText("Muy corto. Toca, habla y vuelve a tocar.")).toBeOnTheScreen();
+    expect(screen.queryByText("Tu audio")).toBeNull();
   });
 });

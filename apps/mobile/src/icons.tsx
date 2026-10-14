@@ -18,7 +18,6 @@ const SHAPES = {
   search: { lines: [[15, 15, 20, 20]], boxes: [[4, 4, 12, 12, 6]] },
   mic: { lines: [[12, 18, 12, 21], [8, 21, 16, 21]], boxes: [[9, 3, 6, 12, 3]], cup: [6, 10, 12, 8, 6] },
   phone: { lines: [[10, 6, 14, 6], [12, 18, 12, 19]], boxes: [[7, 3, 10, 18, 2]] },
-  monitor: { lines: [[8, 21, 16, 21], [12, 16, 12, 21]], boxes: [[3, 4, 18, 12, 2]] },
 } satisfies Record<string, Shape>;
 
 export type IconName = keyof typeof SHAPES;

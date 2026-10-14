@@ -67,6 +67,23 @@ export interface Copy {
   readonly status: Readonly<Record<StatusKey, string>>;
   readonly notices: Readonly<Partial<Record<ErrorCode, string>>>;
   readonly noticeFallback: string;
+  /** Web con audio local: grabación real en el dispositivo, sin traducción todavía. */
+  readonly local: {
+    readonly note: string;
+    readonly listening: string;
+    readonly finishing: string;
+    readonly finish: string;
+    readonly finishingButton: string;
+    readonly clipEyebrow: string;
+    readonly clipNote: string;
+    readonly replay: string;
+    readonly stopPlayback: string;
+    readonly playFailed: string;
+    /** Permiso del micrófono denegado: en web se concede en el navegador, no en los Ajustes del sistema. */
+    readonly micDenied: string;
+    /** Separador decimal de la duración del clip. */
+    readonly decimal: string;
+  };
   readonly picker: {
     readonly title: string;
     readonly close: string;
@@ -137,8 +154,26 @@ export const COPY: Readonly<Record<UiLanguage, Copy>> = {
       VOICE_UNAVAILABLE: "No hay voz para este idioma: lee la traducción.",
       PLAYBACK_INTERRUPTED: "La voz se interrumpió: lee la traducción.",
       UNSUPPORTED_LANGUAGE: "Elige un idioma distinto para cada persona.",
+      RECORDER_FAILED: "No se pudo grabar audio en este navegador.",
+      INVALID_AUDIO: "No se grabó audio. Inténtalo de nuevo.",
+      AUDIO_TOO_LARGE: "El audio es demasiado grande. Graba un turno más corto.",
+      AUDIO_TOO_LONG: "Demasiado largo. Graba hasta 30 segundos.",
     },
     noticeFallback: "Algo falló. Inténtalo de nuevo.",
+    local: {
+      note: "Graba audio en este dispositivo; la traducción aún no está disponible.",
+      listening: "Grabando",
+      finishing: "Terminando",
+      finish: "Grabando: toca para terminar",
+      finishingButton: "Terminando…",
+      clipEyebrow: "Tu audio",
+      clipNote: "Audio local · traducción pendiente",
+      replay: "Escuchar",
+      stopPlayback: "Detener",
+      playFailed: "No se pudo reproducir el audio.",
+      micDenied: "Permite el micrófono en el navegador para grabar.",
+      decimal: ",",
+    },
     picker: {
       title: "Elige tu idioma",
       close: "Cerrar selector de idioma",
@@ -207,8 +242,26 @@ export const COPY: Readonly<Record<UiLanguage, Copy>> = {
       VOICE_UNAVAILABLE: "No voice for this language: read the translation.",
       PLAYBACK_INTERRUPTED: "The voice was interrupted: read the translation.",
       UNSUPPORTED_LANGUAGE: "Choose a different language for each person.",
+      RECORDER_FAILED: "Couldn't record audio in this browser.",
+      INVALID_AUDIO: "No audio was recorded. Try again.",
+      AUDIO_TOO_LARGE: "The audio is too large. Record a shorter turn.",
+      AUDIO_TOO_LONG: "Too long. Record up to 30 seconds.",
     },
     noticeFallback: "Something went wrong. Try again.",
+    local: {
+      note: "Records audio on this device; translation isn't available yet.",
+      listening: "Recording",
+      finishing: "Finishing",
+      finish: "Recording: tap to finish",
+      finishingButton: "Finishing…",
+      clipEyebrow: "Your audio",
+      clipNote: "Local audio · translation pending",
+      replay: "Replay",
+      stopPlayback: "Stop",
+      playFailed: "Couldn't play the audio.",
+      micDenied: "Allow the microphone in your browser to record.",
+      decimal: ".",
+    },
     picker: {
       title: "Choose your language",
       close: "Close language picker",
@@ -229,15 +282,28 @@ export const CHROME = {
   faceToFaceHeader: "Cara a cara · 50/50",
   title: "Conversación",
   subtitle: "Cada persona elige su idioma y habla por turnos.",
-  view: "Vista",
-  viewLocked: "Vista: se cambia al terminar el turno",
-  desktop: "Escritorio",
-  faceToFace: "Cara a cara",
   footer: "Frases de ejemplo. Sin micrófono, audio ni traducción real.",
-  footerMode: "El modo cara a cara conserva dos mitades iguales y gira B 180°.",
-  sharedPhone: "Un teléfono compartido",
-  sharedPhoneText: "Dos mitades de la misma altura.\nB gira con sus textos y controles.",
+  footerLocal: "Audio local en este navegador. Sin traducción real todavía.",
 } as const;
+
+/** Textos de una mitad con audio local: misma interfaz, pero grabar y terminar dicen lo que de verdad ocurre. */
+export function withLocalAudio(copy: Copy): Copy {
+  const { local } = copy;
+  return {
+    ...copy,
+    demoNote: local.note,
+    button: { ...copy.button, finish: local.finish, translating: local.finishingButton },
+    buttonShort: { ...copy.buttonShort, translating: local.finishingButton },
+    status: { ...copy.status, listening: local.listening, translating: local.finishing },
+    notices: { ...copy.notices, MIC_PERMISSION_DENIED: local.micDenied },
+  };
+}
+
+/** «2,5 s · 40 KB»: duración y tamaño reales del clip. */
+export function clipSummary(copy: Copy, durationMs: number, byteLength: number): string {
+  const seconds = (durationMs / 1000).toFixed(1).replace(".", copy.local.decimal);
+  return `${seconds} s · ${String(Math.max(1, Math.round(byteLength / 1024)))} KB`;
+}
 
 export function isUiLanguage(code: string): code is UiLanguage {
   return UI_LANGUAGES.some((language) => language === code);
