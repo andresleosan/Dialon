@@ -116,8 +116,8 @@ function elapse(ms: number) {
   jest.advanceTimersByTime(ms);
 }
 
-async function startRecording(controller = new AbortController()) {
-  const pending = webAudioCapture.start(controller.signal);
+async function startRecording(controller = new AbortController(), onLevel?: (level: number | null) => void) {
+  const pending = webAudioCapture.start(controller.signal, onLevel);
   const stream = new FakeStream();
   mic.resolve(stream);
   const started = await pending;
@@ -363,5 +363,120 @@ describe("webAudioCapture: getUserMedia que lanza en el acto", () => {
     });
     await expect(webAudioCapture.start(signal)).resolves.toMatchObject({ ok: false, code: "RECORDER_FAILED" });
     expect(removed).toHaveBeenCalledTimes(added.mock.calls.length);
+  });
+});
+
+describe("webAudioCapture: medidor de intensidad sobre el mismo micrófono", () => {
+  let contexts: { stream: unknown; close: jest.Mock; source: { connect: jest.Mock; disconnect: jest.Mock } }[];
+  let frames: ((time: number) => void)[];
+
+  beforeEach(() => {
+    contexts = [];
+    frames = [];
+    class FakeContext {
+      state = "running";
+      readonly close = jest.fn(() => Promise.resolve());
+      readonly source = { connect: jest.fn(), disconnect: jest.fn() };
+      stream: unknown;
+      constructor() {
+        contexts.push(this);
+      }
+      createMediaStreamSource(stream: unknown) {
+        this.stream = stream;
+        return this.source;
+      }
+      createAnalyser() {
+        return {
+          fftSize: 2048,
+          connect: jest.fn(),
+          getFloatTimeDomainData: (out: Float32Array) => {
+            out.fill(0.3);
+          },
+        };
+      }
+    }
+    Object.assign(globalThis, {
+      AudioContext: FakeContext,
+      requestAnimationFrame: (callback: (time: number) => void) => frames.push(callback),
+      cancelAnimationFrame: () => undefined,
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, "AudioContext");
+  });
+
+  function paint(time: number) {
+    const pending = frames;
+    frames = [];
+    for (const callback of pending) callback(time);
+  }
+
+  it("una sola petición de micrófono: el medidor analiza el mismo stream que graba y entrega niveles reales", async () => {
+    const onLevel = jest.fn<undefined, [number | null]>();
+    const { recording, recorder } = await startRecording(undefined, onLevel);
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0]?.stream).toBe(recorder.stream);
+    paint(0);
+    expect(onLevel.mock.calls[0]?.[0]).toBeCloseTo(0.3, 5);
+
+    elapse(1000);
+    recording.stop();
+    // El medidor se apaga con el segundo toque, a la vez que el micrófono.
+    expect(contexts[0]?.close).toHaveBeenCalledTimes(1);
+    paint(100);
+    expect(onLevel).toHaveBeenCalledTimes(1);
+    await expect(recording.result).resolves.toMatchObject({ ok: true });
+  });
+
+  it("cancelar, un error o el límite de tiempo también sueltan el medidor", async () => {
+    let session = await startRecording(undefined, jest.fn());
+    session.controller.abort();
+    await expect(session.recording.result).rejects.toMatchObject({ name: "AbortError" });
+    expect(contexts[0]?.close).toHaveBeenCalledTimes(1);
+
+    session = await startRecording(undefined, jest.fn());
+    session.recorder.onerror?.();
+    await session.recording.result;
+    expect(contexts[1]?.close).toHaveBeenCalledTimes(1);
+
+    session = await startRecording(undefined, jest.fn());
+    elapse(DEFAULT_LIMITS.maxAudioMs - 500);
+    expect(contexts[2]?.close).toHaveBeenCalledTimes(1);
+    await expect(session.recording.result).resolves.toMatchObject({ ok: true });
+  });
+
+  it("si el medidor no puede crearse, la grabación sigue intacta y solo avisa null", async () => {
+    Object.assign(globalThis, {
+      AudioContext: jest.fn(() => {
+        throw new Error("sin Web Audio");
+      }),
+    });
+    const onLevel = jest.fn<undefined, [number | null]>();
+    const { recording } = await startRecording(undefined, onLevel);
+    expect(onLevel).toHaveBeenCalledWith(null);
+    elapse(1000);
+    recording.stop();
+    await expect(recording.result).resolves.toMatchObject({ ok: true, value: { info: { durationMs: 1000 } } });
+  });
+
+  it("sin onLevel no crea ningún AudioContext", async () => {
+    const { recording } = await startRecording();
+    expect(contexts).toHaveLength(0);
+    recording.stop();
+    await recording.result;
+  });
+
+  it("sin Web Audio y con un oyente que lanza, la grabación sigue con una sola petición de micrófono", async () => {
+    Reflect.deleteProperty(globalThis, "AudioContext");
+    const onLevel = jest.fn<undefined, [number | null]>(() => {
+      throw new Error("oyente roto");
+    });
+    const { recording } = await startRecording(undefined, onLevel);
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    elapse(1000);
+    recording.stop();
+    await expect(recording.result).resolves.toMatchObject({ ok: true, value: { info: { durationMs: 1000 } } });
   });
 });

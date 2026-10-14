@@ -1,5 +1,6 @@
 import { DEFAULT_LIMITS, validateAudio, type ErrorCode, type ParseResult } from "@dialon/contracts";
-import type { AudioCapture, AudioClip, Recording } from "./capture";
+import type { AudioCapture, AudioClip, LevelListener, Recording } from "./capture";
+import { startLevelMeter } from "./webLevelMeter";
 
 // Preferencia: Opus en WebM (Chrome, Firefox, Edge) y AAC en MP4 (Safari). Solo tipos que admite el contrato.
 const MIME_TYPES = ["audio/webm;codecs=opus", "audio/mp4;codecs=mp4a.40.2", "audio/webm", "audio/mp4"];
@@ -64,7 +65,13 @@ function requestMicrophone(getUserMedia: MediaDevices["getUserMedia"], signal: A
   });
 }
 
-function record(recorder: MediaRecorder, stream: MediaStream, mimeType: string, signal: AbortSignal): Recording {
+function record(
+  recorder: MediaRecorder,
+  stream: MediaStream,
+  mimeType: string,
+  signal: AbortSignal,
+  onLevel?: LevelListener,
+): Recording {
   const startedAt = performance.now();
   const chunks: Blob[] = [];
   let bytes = 0;
@@ -78,6 +85,8 @@ function record(recorder: MediaRecorder, stream: MediaStream, mimeType: string, 
     rejectResult = reject;
   });
   const limitTimer = setTimeout(stop, DEFAULT_LIMITS.maxAudioMs - LIMIT_MARGIN_MS);
+  // Medidor opcional sobre el mismo stream; se suelta junto con el micrófono.
+  const stopMeter = onLevel ? startLevelMeter(stream, onLevel) : () => undefined;
 
   /** Suelta todo lo que posee la grabación: escuchas, temporizadores, micrófono, grabador y trozos. */
   function release() {
@@ -85,6 +94,7 @@ function record(recorder: MediaRecorder, stream: MediaStream, mimeType: string, 
     clearTimeout(limitTimer);
     clearTimeout(finalizeTimer);
     signal.removeEventListener("abort", onAbort);
+    stopMeter();
     recorder.ondataavailable = null;
     recorder.onstop = null;
     recorder.onerror = null;
@@ -110,7 +120,8 @@ function record(recorder: MediaRecorder, stream: MediaStream, mimeType: string, 
     stoppedAt = performance.now();
     clearTimeout(limitTimer);
     if (recorder.state !== "inactive") recorder.stop();
-    // El micrófono se apaga ya; el navegador conserva lo grabado para el último trozo.
+    // El micrófono y su medidor se apagan ya; el navegador conserva lo grabado para el último trozo.
+    stopMeter();
     stopTracks(stream);
     finalizeTimer = setTimeout(() => {
       finish(failure("RECORDER_FAILED", "la grabación no terminó a tiempo"));
@@ -147,7 +158,7 @@ function record(recorder: MediaRecorder, stream: MediaStream, mimeType: string, 
 
 /** Grabación local en el navegador con getUserMedia + MediaRecorder. Nada sale del dispositivo. */
 export const webAudioCapture: AudioCapture = {
-  async start(signal) {
+  async start(signal, onLevel) {
     if (isAborted(signal)) throw abortReason(signal);
     const { MediaRecorder: Recorder, navigator } = globalThis as BrowserMedia;
     const devices = navigator?.mediaDevices;
@@ -177,6 +188,6 @@ export const webAudioCapture: AudioCapture = {
       stopTracks(stream);
       return failure("RECORDER_FAILED", "no se pudo iniciar la grabación");
     }
-    return { ok: true, value: record(recorder, stream, mimeType, signal) };
+    return { ok: true, value: record(recorder, stream, mimeType, signal, onLevel) };
   },
 };

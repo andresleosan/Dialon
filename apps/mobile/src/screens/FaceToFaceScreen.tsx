@@ -26,7 +26,7 @@ import {
   type StatusKey,
 } from "../copy";
 import { BrandBars, Icon, MicGlyph } from "../icons";
-import { COLORS, PANELS } from "../theme";
+import { COLORS, panelOf } from "../theme";
 import { useDemoConversation, type LocalClip, type Playback } from "../useDemoConversation";
 import { LanguagePicker, type Rect } from "./LanguagePicker";
 
@@ -110,6 +110,8 @@ interface Sizes {
   readonly micIcon: number;
   readonly label: number;
   readonly labelGap: number;
+  /** Alto de las barras de intensidad mientras se graba. */
+  readonly meter: number;
 }
 
 const COMPACT = {
@@ -162,12 +164,14 @@ const SIZES: Readonly<Record<Layout, Sizes>> = {
     caption: 10,
     value: 16,
     mic: 64,
+    meter: 72,
     micIcon: 29,
     label: 12,
     labelGap: 8,
   },
   phone: {
     ...COMPACT,
+    meter: 48,
     padTop: 22,
     padX: 20,
     padBottom: 18,
@@ -184,6 +188,7 @@ const SIZES: Readonly<Record<Layout, Sizes>> = {
   // Teléfono en horizontal: cada mitad es baja, así que todo es más compacto y los controles se desplazan con el cuerpo.
   landscape: {
     ...COMPACT,
+    meter: 30,
     padTop: 10,
     padX: 20,
     padBottom: 8,
@@ -202,6 +207,14 @@ const SIZES: Readonly<Record<Layout, Sizes>> = {
     labelGap: 4,
   },
 };
+
+/**
+ * Alto de una barra a partir del RMS medido (0..1). La voz normal ronda RMS 0,02–0,2, así que una escala de raíz
+ * la hace visible sin inventar nada: el silencio queda en una línea plana de 2 px y más intensidad, más alto.
+ */
+function barHeight(level: number, max: number): number {
+  return Math.max(2, Math.round(max * Math.min(1, Math.sqrt(level) * 1.6)));
+}
 
 interface HalfView {
   readonly status: StatusKey;
@@ -292,6 +305,8 @@ interface HalfProps {
   readonly local: boolean;
   /** Clip local de esta persona, si lo hay. */
   readonly clip?: LocalClip;
+  /** Intensidad medida mientras graba esta persona; solo la recibe quien graba. */
+  readonly levels?: readonly number[];
   readonly playback: Playback;
   readonly selectorRef: (node: View | null) => void;
   readonly onPress: () => void;
@@ -310,6 +325,7 @@ function ConversationHalf({
   layout,
   local,
   clip,
+  levels,
   playback,
   selectorRef,
   onPress,
@@ -318,7 +334,7 @@ function ConversationHalf({
   onPlay,
   onStopPlayback,
 }: HalfProps) {
-  const panel = PANELS[participant];
+  const panel = panelOf(participant, layout === "desktop");
   const size = SIZES[layout];
   const desktop = layout === "desktop";
   const landscape = layout === "landscape";
@@ -528,6 +544,8 @@ function ConversationHalf({
           >
             {clip !== undefined
               ? copy.local.clipEyebrow
+              : levels !== undefined
+                ? copy.local.levelEyebrow
               : view.received !== undefined
                 ? copy.receivedEyebrow
                 : view.said !== undefined
@@ -563,6 +581,18 @@ function ConversationHalf({
                 </Text>
               )}
             </>
+          ) : levels !== undefined ? (
+            // Barras decorativas con la intensidad medida; el estado legible es el texto «Grabando».
+            <View aria-hidden testID={`medidor-${participant}`} style={[styles.meter, { height: size.meter }]}>
+              {levels.map((level, index) => (
+                <View
+                  // Historia de longitud fija que se desplaza: el índice identifica la posición de cada barra.
+                  key={index}
+                  testID={`barra-${participant}`}
+                  style={[styles.bar, { height: barHeight(level, size.meter), backgroundColor: panel.texto }]}
+                />
+              ))}
+            </View>
           ) : reading !== undefined ? (
             <>
               <Text
@@ -631,7 +661,7 @@ interface PickerState {
 export function FaceToFaceScreen({ createRequestId, audio }: FaceToFaceScreenProps) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { state, languages, pairIssue, press, cancel, selectLanguage, clip, playback, play, stopPlayback } =
+  const { state, languages, pairIssue, press, cancel, selectLanguage, clip, playback, play, stopPlayback, levels } =
     useDemoConversation(createRequestId, audio);
   const [picker, setPicker] = useState<PickerState>();
   const selectors = useRef<Partial<Record<Participant, View | null>>>({});
@@ -670,6 +700,7 @@ export function FaceToFaceScreen({ createRequestId, audio }: FaceToFaceScreenPro
       layout={layout}
       local={audio !== undefined}
       clip={clip?.participant === participant ? clip : undefined}
+      levels={state.status === `RECORDING_${participant}` && levels.length > 0 ? levels : undefined}
       playback={playback}
       onPlay={play}
       onStopPlayback={stopPlayback}
@@ -839,7 +870,8 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 34, lineHeight: 37, fontWeight: "700", letterSpacing: -1.1, color: COLORS.tinta, marginBottom: 8 },
   subtitle: { fontSize: 15, lineHeight: 18, color: COLORS.apagado },
-  sideBySide: { height: 552, flexDirection: "row-reverse", gap: 16 },
+  // A primero en el árbol y a la izquierda.
+  sideBySide: { height: 552, flexDirection: "row", gap: 16 },
   footer: {
     paddingTop: 25,
     paddingBottom: 24,
@@ -905,6 +937,8 @@ const styles = StyleSheet.create({
   cancelText: { fontSize: 14, lineHeight: 18, fontWeight: "600" },
   clipButton: { alignSelf: "flex-start", marginTop: 14 },
   clipFailed: { marginTop: 8 },
+  meter: { flexDirection: "row", alignItems: "center", gap: 3, overflow: "hidden" },
+  bar: { width: 4, borderRadius: 2 },
   speak: { alignItems: "center", borderRadius: 12 },
   ring: { position: "absolute", top: -7, left: -7 },
   circle: { flex: 1, borderWidth: 2, alignItems: "center", justifyContent: "center" },

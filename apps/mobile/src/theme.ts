@@ -59,8 +59,9 @@ export interface Panel {
   readonly avisoTexto: string;
 }
 
-export const PANELS: Readonly<Record<Participant, Panel>> = {
-  B: {
+// Por tono, no por persona: en el teléfono B es marino y A blanca; en escritorio, al revés (ver `panelOf`).
+const PANELS = {
+  navy: {
     fondo: COLORS.marino,
     borde: COLORS.marino,
     texto: COLORS.blanco,
@@ -78,7 +79,7 @@ export const PANELS: Readonly<Record<Participant, Panel>> = {
     avisoFondo: "#FFE8A3",
     avisoTexto: "#3D2E00",
   },
-  A: {
+  white: {
     fondo: COLORS.blanco,
     borde: COLORS.linea,
     texto: COLORS.marino,
@@ -96,4 +97,13 @@ export const PANELS: Readonly<Record<Participant, Panel>> = {
     avisoFondo: "#FFF4D6",
     avisoTexto: "#5C4400",
   },
-};
+} as const satisfies Readonly<Record<string, Panel>>;
+
+/**
+ * Colores del panel de cada persona según dónde se dibuja. Teléfono: B marino arriba (girada) y A blanca abajo.
+ * Escritorio: A marino a la izquierda y B blanca a la derecha. Solo cambia el aspecto; la persona sigue siendo la misma.
+ */
+export function panelOf(participant: Participant, desktop: boolean): Panel {
+  const navy = desktop ? participant === "A" : participant === "B";
+  return navy ? PANELS.navy : PANELS.white;
+}

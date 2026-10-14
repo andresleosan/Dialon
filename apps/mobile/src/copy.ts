@@ -75,6 +75,8 @@ export interface Copy {
     readonly finish: string;
     readonly finishingButton: string;
     readonly clipEyebrow: string;
+    /** Ceja sobre las barras de intensidad mientras se graba. */
+    readonly levelEyebrow: string;
     readonly clipNote: string;
     readonly replay: string;
     readonly stopPlayback: string;
@@ -167,6 +169,7 @@ export const COPY: Readonly<Record<UiLanguage, Copy>> = {
       finish: "Grabando: toca para terminar",
       finishingButton: "Terminando…",
       clipEyebrow: "Tu audio",
+      levelEyebrow: "Tu voz",
       clipNote: "Audio local · traducción pendiente",
       replay: "Escuchar",
       stopPlayback: "Detener",
@@ -255,6 +258,7 @@ export const COPY: Readonly<Record<UiLanguage, Copy>> = {
       finish: "Recording: tap to finish",
       finishingButton: "Finishing…",
       clipEyebrow: "Your audio",
+      levelEyebrow: "Your voice",
       clipNote: "Local audio · translation pending",
       replay: "Replay",
       stopPlayback: "Stop",
@@ -277,7 +281,7 @@ export const COPY: Readonly<Record<UiLanguage, Copy>> = {
 
 /** Textos generales de la pantalla (cabecera, vista y pie), en español. */
 export const CHROME = {
-  brand: "dialon",
+  brand: "Dialon",
   demo: "DEMO",
   faceToFaceHeader: "Cara a cara · 50/50",
   title: "Conversación",

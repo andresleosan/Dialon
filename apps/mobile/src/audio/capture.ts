@@ -18,13 +18,20 @@ export interface Recording {
   readonly result: Promise<ParseResult<AudioClip>>;
 }
 
+/**
+ * Intensidad medida del micrófono mientras se graba, 0..1 (RMS, sin calibrar en decibelios). `null`: no hay medición
+ * disponible (o dejó de haberla) y no debe mostrarse nada.
+ */
+export type LevelListener = (level: number | null) => void;
+
 /** Grabador inyectable (web hoy; un adaptador nativo implementará lo mismo). */
 export interface AudioCapture {
   /**
    * Pide el micrófono y empieza a grabar. `signal` cancela en cualquier momento, también con el permiso pendiente:
-   * libera el micrófono y la promesa se rechaza con el motivo de la cancelación.
+   * libera el micrófono y la promesa se rechaza con el motivo de la cancelación. Con `onLevel`, informa de la
+   * intensidad real mientras graba; la medición es opcional y si falla la grabación sigue igual.
    */
-  start(signal: AbortSignal): Promise<ParseResult<Recording>>;
+  start(signal: AbortSignal, onLevel?: LevelListener): Promise<ParseResult<Recording>>;
 }
 
 /** Reproductor local inyectable. */

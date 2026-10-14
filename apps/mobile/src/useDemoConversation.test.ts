@@ -1,7 +1,7 @@
 import type { ParseResult } from "@dialon/contracts";
 import { act, renderHook } from "@testing-library/react-native";
 import { AppState, Platform, type AppStateStatus } from "react-native";
-import type { AudioClip, LocalAudio, Recording } from "./audio/capture";
+import type { AudioClip, LevelListener, LocalAudio, Recording } from "./audio/capture";
 import { useDemoConversation } from "./useDemoConversation";
 
 function uuidSequence() {
@@ -158,10 +158,11 @@ function scriptedAudio() {
     started: Deferred<ParseResult<Recording>>;
     result: Deferred<ParseResult<AudioClip>>;
     stop: jest.Mock;
+    onLevel?: LevelListener;
   }[] = [];
   const plays: { signal: AbortSignal; done: Deferred<undefined> }[] = [];
-  const start = jest.fn((signal: AbortSignal) => {
-        const session = { signal, started: deferred<ParseResult<Recording>>(), result: deferred<ParseResult<AudioClip>>(), stop: jest.fn() };
+  const start = jest.fn((signal: AbortSignal, onLevel?: LevelListener) => {
+        const session = { signal, onLevel, started: deferred<ParseResult<Recording>>(), result: deferred<ParseResult<AudioClip>>(), stop: jest.fn() };
         session.result.promise.catch(() => undefined);
         signal.addEventListener("abort", () => {
           session.started.reject(signal.reason);
@@ -541,5 +542,61 @@ describe("useDemoConversation con audio local (web)", () => {
         else Reflect.deleteProperty(globalThis, name);
       }
     }
+  });
+  it("niveles reales solo de la grabación activa: historia acotada, null los oculta y se reinician al terminar, cancelar o empezar otro turno", async () => {
+    const script = scriptedAudio();
+    const result = await render(script.audio);
+    const level = async (value: number | null, index = 0) => {
+      await act(() => {
+        script.sessions[index]?.onLevel?.(value);
+      });
+    };
+    await act(() => {
+      result.current.press("A");
+    });
+    expect(result.current.levels).toEqual([]);
+    await script.grant();
+    await level(0);
+    await level(0.5);
+    expect(result.current.levels).toEqual([0, 0.5]);
+    for (let i = 0; i < 60; i += 1) await level(0.1);
+    expect(result.current.levels.length).toBeLessThan(60);
+    expect(result.current.levels.at(-1)).toBe(0.1);
+    await level(null);
+    expect(result.current.levels).toEqual([]);
+    await level(0.2);
+    expect(result.current.levels).toEqual([0.2]);
+
+    // El segundo toque apaga el medidor: un nivel que llegue tarde ya no pinta nada.
+    await act(() => {
+      result.current.press("A");
+    });
+    expect(result.current.levels).toEqual([]);
+    await level(0.9);
+    expect(result.current.levels).toEqual([]);
+    await script.finish({ ok: true, value: CLIP });
+    expect(result.current.levels).toEqual([]);
+
+    await act(() => {
+      result.current.press("B");
+    });
+    await script.grant(1);
+    await level(0.3, 1);
+    expect(result.current.levels).toEqual([0.3]);
+    await act(() => {
+      result.current.cancel();
+    });
+    expect(result.current.levels).toEqual([]);
+    await level(0.7, 1);
+    await level(0.7, 0);
+    expect(result.current.levels).toEqual([]);
+
+    await act(() => {
+      result.current.press("A");
+    });
+    await script.grant(2);
+    expect(result.current.levels).toEqual([]);
+    await level(0.4, 2);
+    expect(result.current.levels).toEqual([0.4]);
   });
 });

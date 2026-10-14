@@ -11,7 +11,7 @@ Patrones de jerarquía tomados de pantallas de Mobbin verificadas el 2026-10-13 
 ni textos; capturas locales en `.tools/referencias/mobbin-2026-10-13/`, fuera de Git):
 [Singapore Airlines Translation Assistant](https://mobbin.com/screens/9975067b-7c96-4cc3-af87-3ac651cd8c7f),
 [Meta AI Live translation](https://mobbin.com/screens/55a61904-5362-4e9a-b67d-f64d5a976d96) y
-[CapCut Video translator](https://mobbin.com/screens/81cf3e13-fc99-4b28-8bbe-4a11584205fc). La marca «dialon» y su
+[CapCut Video translator](https://mobbin.com/screens/81cf3e13-fc99-4b28-8bbe-4a11584205fc). La marca «Dialon» y su
 icono de barras son propios de la maqueta.
 
 ## Principios
@@ -25,9 +25,10 @@ icono de barras son propios de la maqueta.
 ## Color
 
 Paleta fija: **no sigue el tema oscuro del sistema ni del navegador** (la app no lee `useColorScheme`). Fondo
-`#EEF1F6`; B marino `#12295C` con texto blanco; A blanca `#FFFFFF` con borde `#DCE2EB` y texto marino.
+`#EEF1F6`; panel marino `#12295C` con texto blanco y panel blanco `#FFFFFF` con borde `#DCE2EB` y texto marino. En el
+teléfono B es marino y A blanca; en escritorio, al revés: A marino a la izquierda y B blanca a la derecha.
 
-| Token del panel | B | A | Uso |
+| Token del panel | Marino | Blanco | Uso |
 |---|---|---|---|
 | `fondo` / `texto` | `#12295C` / `#FFFFFF` | `#FFFFFF` / `#12295C` | panel, frase, persona, estado |
 | `ceja` | `#BFCDE7` | `#657594` | «Tu traducción», «Lo que dijiste»… |
@@ -60,21 +61,22 @@ autónimos `#73809A` → `#626D83`). Mínimos medidos con la fórmula WCAG: **te
 ```
 Teléfono (cara a cara 50/50)            Escritorio
 ┌───────────────────────────────────┐   ┌────────────────────────────────────────────┐
-│ dialon  Cara a cara · 50/50  DEMO │   │ dialon                             DEMO    │
+│ Dialon  Cara a cara · 50/50  DEMO │   │ Dialon                             DEMO    │
 ├───────────────────────────────────┤   │ Conversación                               │
-│ B marino, girada 180°             │   │ [ B marino, derecha ] [ A blanca, derecha ]│
+│ B marino, girada 180°             │   │ [ A marino, derecha ] [ B blanca, derecha ]│
 ├───────────────────────────────────┤   │ DEMO  Audio local en este navegador…       │
 │ A blanca, derecha                 │   └────────────────────────────────────────────┘
 └───────────────────────────────────┘
 ```
 
 - **Teléfono:** área útil en dos mitades exactamente iguales; B arriba con todo su panel girado 180° y A abajo.
-- **Escritorio:** dos paneles iguales lado a lado, ambos derechos: B a la izquierda y A a la derecha. Pie discreto:
+- **Escritorio:** dos paneles iguales lado a lado, ambos derechos: A marino a la izquierda y B blanca a la derecha.
+  Solo cambia el aspecto: cada persona conserva su idioma, sus textos y sus controles. Pie discreto:
   «DEMO · Audio local en este navegador. Sin traducción real todavía.».
 - **Sin selector manual:** la disposición se elige sola y nunca solo por el ancho. Nativo: teléfono. Web: teléfono si
   el navegador se declara móvil o, sin pista, si es táctil (`pointer: coarse`) con el lado corto ≤700; si no,
   escritorio, aunque se estreche la ventana. Un teléfono en horizontal sigue siendo cara a cara.
-- A va primero en el árbol accesible en todas las disposiciones (en escritorio se dibuja con `row-reverse`).
+- A va primero en el árbol accesible en todas las disposiciones.
 - Al girar o redimensionar, el turno sigue intacto (el estado vive por encima de la disposición) y un selector
   abierto se cierra en vez de quedar donde ya no está su botón.
 
@@ -151,8 +153,8 @@ Aparecen en la mitad que indica la máquina de estados, con «!» y texto, y des
 
 ## Accesibilidad y movimiento
 
-- Foco de teclado visible: anillo del navegador coloreado con el texto de cada superficie (blanco sobre B, marino
-  sobre A, el fondo y el selector); el buscador marca el foco con un borde marino de 2 px.
+- Foco de teclado visible: anillo del navegador coloreado con el texto de cada superficie (blanco sobre el panel
+  marino; marino sobre el panel blanco, el fondo y el selector); el buscador marca el foco con un borde marino de 2 px.
 - Botones deshabilitados con explicación: «Espera: habla la otra persona», «Hablar no disponible» + texto del motivo.
 - Sin animaciones. Orientación vertical en el teléfono.
 - Pendiente con dispositivo: TalkBack (orden, foco al cerrar el selector), teclado nativo con el selector abierto
@@ -164,7 +166,7 @@ Aparecen en la mitad que indica la máquina de estados, con «!» y texto, y des
 |---|---|---|
 | Paleta fija marino/blanco aunque el sistema pida oscuro | `theme.ts` | prueba de componente + QA web en tema oscuro |
 | Teléfono: mitades iguales, B girada 180°, A primero | `FaceToFaceScreen` | prueba de componente + QA web 360×640 y 393×852 |
-| Disposición automática sin selector: escritorio derecho (B izquierda, A derecha); teléfono 50/50 con B girada también en horizontal | `FaceToFaceScreen` | pruebas de componente (escritorio, redimensionar, vertical/horizontal, pistas web) + QA web 1440×900 |
+| Disposición automática sin selector: escritorio derecho (A marino izquierda, B blanca derecha); teléfono 50/50 con B girada también en horizontal | `FaceToFaceScreen` | pruebas de componente (escritorio, redimensionar, vertical/horizontal, pistas web) + QA web 1440×900 |
 | Selector por persona, buscable, cierre por botón/fondo/atrás/Escape | `LanguagePicker` | pruebas de componente + QA de foco web |
 | Sin intercambio; par igual o por validar bloquea los dos «Hablar» | `useDemoConversation` | pruebas del controlador y de pantalla |
 | Idiomas congelados durante el turno | `useDemoConversation` + selectores | pruebas por fase (preparar, escuchar, traducir, voz) |

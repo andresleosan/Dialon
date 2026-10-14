@@ -44,7 +44,12 @@ export type Playback = "idle" | "playing" | "failed";
 interface CaptureOwner {
   readonly controller: AbortController;
   recording?: Recording;
+  /** Pasa a `false` con el segundo toque: desde entonces ningún nivel tardío se pinta. */
+  metering: boolean;
 }
+
+/** Niveles recientes que se dibujan como barras (unos 1,6 s a ~20 lecturas por segundo). */
+const LEVEL_HISTORY = 32;
 
 function otherParticipant(participant: Participant): Participant {
   return participant === "A" ? "B" : "A";
@@ -86,6 +91,8 @@ export function useDemoConversation(createRequestId: () => string, audio?: Local
   const [languages, setLanguages] = useState<Languages>({ A: "es", B: "en" });
   const [clip, setClip] = useState<LocalClip>();
   const [playback, setPlayback] = useState<Playback>("idle");
+  // Intensidad real del micrófono de la grabación activa; vacía si no hay grabación o no hay medición.
+  const [levels, setLevels] = useState<readonly number[]>([]);
   const pairIssue = pairIssueOf(languages);
   const recordingStartedAt = useRef(0);
   const capture = useRef<CaptureOwner>(undefined);
@@ -145,13 +152,17 @@ export function useDemoConversation(createRequestId: () => string, audio?: Local
   useEffect(() => {
     if (!audio || !captureTurn) return undefined;
     const { requestId, participant } = captureTurn;
-    const owner: CaptureOwner = { controller: new AbortController() };
+    const owner: CaptureOwner = { controller: new AbortController(), metering: true };
     capture.current = owner;
     const { signal } = owner.controller;
     // Tras cada espera: si el turno se canceló o cambió, su respuesta ya no toca nada.
     const stale = () => signal.aborted;
+    const onLevel = (level: number | null) => {
+      if (stale() || !owner.metering) return;
+      setLevels((current) => (level === null ? [] : [...current, level].slice(-LEVEL_HISTORY)));
+    };
     const run = async () => {
-      const started = await audio.capture.start(signal);
+      const started = await audio.capture.start(signal, onLevel);
       if (stale()) return;
       if (!started.ok) {
         dispatch({ type: "FAILED", requestId, code: started.code });
@@ -179,6 +190,7 @@ export function useDemoConversation(createRequestId: () => string, audio?: Local
       owner.controller.abort();
       // Solo suelta la referencia si sigue siendo suya: nunca la de un turno más nuevo.
       if (capture.current === owner) capture.current = undefined;
+      setLevels([]);
     };
   }, [audio, captureTurn]);
 
@@ -186,6 +198,7 @@ export function useDemoConversation(createRequestId: () => string, audio?: Local
   const abortCapture = useCallback(() => {
     capture.current?.controller.abort();
     capture.current = undefined;
+    setLevels([]);
   }, []);
 
   const stopPlayback = useCallback(() => {
@@ -251,7 +264,12 @@ export function useDemoConversation(createRequestId: () => string, audio?: Local
     (participant: Participant) => {
       if (state.status !== "IDLE") {
         const ownRecording = state.status === "RECORDING_A" || state.status === "RECORDING_B";
-        if (ownRecording && state.turn.participant === participant) capture.current?.recording?.stop();
+        const owner = capture.current;
+        if (ownRecording && state.turn.participant === participant && owner) {
+          owner.metering = false;
+          setLevels([]);
+          owner.recording?.stop();
+        }
         dispatch({ ...state.turn, type: "PRESS", participant });
         return;
       }
@@ -289,5 +307,5 @@ export function useDemoConversation(createRequestId: () => string, audio?: Local
     [state.status, languages, discardClip],
   );
 
-  return { state, languages, pairIssue, press, cancel, selectLanguage, clip, playback, play, stopPlayback };
+  return { state, languages, pairIssue, press, cancel, selectLanguage, clip, playback, play, stopPlayback, levels };
 }

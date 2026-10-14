@@ -1,5 +1,14 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react-native";
-import { AccessibilityInfo, Dimensions, Platform, TextInput, useColorScheme } from "react-native";
+import {
+  AccessibilityInfo,
+  Dimensions,
+  Platform,
+  StyleSheet,
+  TextInput,
+  useColorScheme,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import type { LocalAudio } from "../audio/capture";
 import { webAudioCapture } from "../audio/webCapture";
@@ -142,6 +151,12 @@ describe("FaceToFaceScreen DEMO en el móvil: cara a cara 50/50", () => {
     expect(fourth).toHaveAccessibleName(B.start);
   });
 
+  it("la marca visible es «Dialon» con mayúscula", async () => {
+    await renderScreen();
+    expect(screen.getByText("Dialon")).toBeOnTheScreen();
+    expect(screen.queryByText("dialon")).toBeNull();
+  });
+
   it("mantiene la paleta fija marino/blanco aunque el sistema prefiera el tema oscuro", async () => {
     jest.mocked(useColorScheme).mockReturnValue("dark");
     await renderScreen();
@@ -159,7 +174,8 @@ function useDesktopBrowser() {
 const ROTATED = { transform: [{ rotate: "180deg" }] };
 
 function expectDesktop() {
-  expect(screen.getByTestId("conversacion")).toHaveStyle({ flexDirection: "row-reverse" });
+  // A primero en el árbol y dibujada a la izquierda; B a la derecha.
+  expect(screen.getByTestId("conversacion")).toHaveStyle({ flexDirection: "row" });
   expect(screen.getByTestId("mitad-A")).not.toHaveStyle(ROTATED);
   expect(screen.getByTestId("mitad-B")).not.toHaveStyle(ROTATED);
 }
@@ -186,8 +202,18 @@ describe("FaceToFaceScreen: disposición automática según el dispositivo", () 
     setViewport(1440, 900);
     await renderScreen();
     expectDesktop();
-    expect(screen.getByTestId("mitad-B")).toHaveStyle({ backgroundColor: "#12295C" });
-    expect(screen.getByTestId("mitad-A")).toHaveStyle({ backgroundColor: "#FFFFFF" });
+    // Escritorio: A marino a la izquierda y B blanca a la derecha; cada una conserva su idioma y sus controles.
+    expect(screen.getByTestId("mitad-A")).toHaveStyle({ backgroundColor: "#12295C" });
+    expect(screen.getByTestId("mitad-B")).toHaveStyle({ backgroundColor: "#FFFFFF" });
+    const [first, second, third, fourth] = screen.getAllByRole("button");
+    expect(first).toHaveAccessibleName(A.selector);
+    expect(second).toHaveAccessibleName(A.start);
+    expect(third).toHaveAccessibleName(B.selector);
+    expect(fourth).toHaveAccessibleName(B.start);
+    expect(within(screen.getByTestId("mitad-A")).getByText(EMPTY.es)).toBeOnTheScreen();
+    expect(within(screen.getByTestId("mitad-B")).getByText(EMPTY.en)).toBeOnTheScreen();
+    expect(screen.getByText("Dialon")).toBeOnTheScreen();
+    expect(screen.queryByText("dialon")).toBeNull();
     expect(screen.getByText("Frases de ejemplo. Sin micrófono, audio ni traducción real.")).toBeOnTheScreen();
     expect(screen.queryAllByRole("radio")).toHaveLength(0);
     expect(screen.queryAllByRole("radiogroup")).toHaveLength(0);
@@ -757,10 +783,34 @@ function installBrowser() {
       audios.push(this);
     }
   }
+  // Web Audio simulado: el analizador devuelve el nivel que el test elige, como muestras sintéticas.
+  let samplesLevel = 0;
+  let frames: ((time: number) => void)[] = [];
+  let frameTime = 0;
+  class FakeAudioContext {
+    state = "running";
+    close() {
+      return Promise.resolve();
+    }
+    createMediaStreamSource() {
+      return { connect: jest.fn(), disconnect: jest.fn() };
+    }
+    createAnalyser() {
+      return {
+        fftSize: 1024,
+        getFloatTimeDomainData: (out: Float32Array) => {
+          out.fill(samplesLevel);
+        },
+      };
+    }
+  }
   Object.assign(globalThis, {
     MediaRecorder: Recorder,
     Blob: NodeBlob,
     Audio: FakeAudio,
+    AudioContext: FakeAudioContext,
+    requestAnimationFrame: (callback: (time: number) => void) => frames.push(callback),
+    cancelAnimationFrame: () => undefined,
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
   });
@@ -773,6 +823,16 @@ function installBrowser() {
     return found;
   };
   return {
+    /** El micrófono capta muestras de amplitud `level` durante un cuadro (≥50 ms después del anterior). */
+    async sound(level: number) {
+      samplesLevel = level;
+      frameTime += 60;
+      const pending = frames;
+      frames = [];
+      await act(() => {
+        for (const callback of pending) callback(frameTime);
+      });
+    },
     getUserMedia,
     tracks,
     audios,
@@ -802,6 +862,10 @@ const LOCAL_NOTE = {
 };
 
 describe("FaceToFaceScreen en web: audio local real", () => {
+  const originalFrames = {
+    requestAnimationFrame: globalThis.requestAnimationFrame,
+    cancelAnimationFrame: globalThis.cancelAnimationFrame,
+  };
   const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   const originalBlob = globalThis.Blob;
 
@@ -815,7 +879,8 @@ describe("FaceToFaceScreen en web: audio local real", () => {
     jest.useRealTimers();
     // Desmonta antes de retirar el navegador simulado: la limpieza del controlador aún lo usa.
     await cleanup();
-    for (const name of ["MediaRecorder", "Audio", "addEventListener", "removeEventListener"]) {
+    Object.assign(globalThis, originalFrames);
+    for (const name of ["MediaRecorder", "Audio", "AudioContext", "addEventListener", "removeEventListener"]) {
       Reflect.deleteProperty(globalThis, name);
     }
     Object.assign(globalThis, { Blob: originalBlob });
@@ -913,5 +978,34 @@ describe("FaceToFaceScreen en web: audio local real", () => {
     });
     expect(halfA.getByText("Muy corto. Toca, habla y vuelve a tocar.")).toBeOnTheScreen();
     expect(screen.queryByText("Tu audio")).toBeNull();
+  });
+  it("mientras A graba, solo su mitad muestra barras con la intensidad real; el silencio queda plano y al cancelar desaparecen", async () => {
+    const browser = installBrowser();
+    const { halfA, halfB } = await renderScreen(uuidSequence(), WEB_AUDIO);
+    await fireEvent.press(halfA.getByRole("button", { name: A.start }));
+    await browser.grant();
+    const bars = () =>
+      screen
+        .queryAllByTestId("barra-A", { includeHiddenElements: true })
+        .map((bar) => Number(StyleSheet.flatten(bar.props.style as StyleProp<ViewStyle>).height));
+
+    expect(bars()).toEqual([]);
+    await browser.sound(0);
+    await browser.sound(0);
+    await browser.sound(0.3);
+    const [quiet, silent, loud] = bars();
+    expect(bars()).toHaveLength(3);
+    expect(quiet).toBe(silent);
+    expect(loud).toBeGreaterThan(quiet ?? Infinity);
+    expect(screen.queryAllByTestId("barra-B", { includeHiddenElements: true })).toHaveLength(0);
+    // Las barras son decorativas: el estado legible sigue siendo el texto.
+    expect(screen.queryByTestId("medidor-A")).toBeNull();
+    expect(halfA.getByText("Grabando")).toBeOnTheScreen();
+    expect(halfB.getByRole("button", { name: B.wait })).toBeDisabled();
+
+    await fireEvent.press(halfA.getByRole("button", { name: A.cancel }));
+    expect(bars()).toEqual([]);
+    await browser.sound(0.5);
+    expect(bars()).toEqual([]);
   });
 });
