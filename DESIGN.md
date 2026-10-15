@@ -77,6 +77,11 @@ Teléfono (cara a cara 50/50)            Escritorio
   el navegador se declara móvil o, sin pista, si es táctil (`pointer: coarse`) con el lado corto ≤700; si no,
   escritorio, aunque se estreche la ventana. Un teléfono en horizontal sigue siendo cara a cara.
 - A va primero en el árbol accesible en todas las disposiciones.
+- **Sesión (web):** pantalla inicial con «Continuar con Google» (marino) y «Probar demo local» (contorno), en una
+  tarjeta blanca con desplazamiento para letra grande. En la conversación, la cabecera añade un botón de ≥48
+  («Cerrar sesión» o, como invitado, «Iniciar sesión») con nombre accesible completo. En escritorio se ve además el
+  nombre visible de la cuenta (o «Cuenta de Google», nunca el correo). En el teléfono, un aviso de sesión ocupa el
+  hueco del modo: la cabecera no crece y las mitades no cambian. Nativo: sin pantalla de sesión.
 - Al girar o redimensionar, el turno sigue intacto (el estado vive por encima de la disposición) y un selector
   abierto se cierra en vez de quedar donde ya no está su botón.
 

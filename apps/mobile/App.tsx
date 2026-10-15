@@ -4,7 +4,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import type { LocalAudio } from "./src/audio/capture";
 import { webAudioCapture } from "./src/audio/webCapture";
 import { webAudioPlayer } from "./src/audio/webPlayer";
-import { FaceToFaceScreen } from "./src/screens/FaceToFaceScreen";
+import { firebaseAuth } from "./src/auth/firebaseAuth";
+import { AuthGate } from "./src/screens/AuthGate";
 
 // Solo el navegador graba y reproduce audio local; en nativo sigue la DEMO simulada hasta tener su adaptador.
 const audio: LocalAudio | undefined =
@@ -13,7 +14,8 @@ const audio: LocalAudio | undefined =
 export default function App() {
   return (
     <SafeAreaProvider>
-      <FaceToFaceScreen createRequestId={randomUUID} audio={audio} />
+      {/* Web: sesión con Google o demo local sin cuenta. Nativo (sin proveedor): la DEMO tal cual. */}
+      <AuthGate provider={firebaseAuth} createRequestId={randomUUID} audio={audio} />
     </SafeAreaProvider>
   );
 }

@@ -1,5 +1,6 @@
 import type { ErrorCode } from "@dialon/contracts";
 import type { Participant } from "@dialon/core";
+import type { AuthErrorCode } from "./auth/session";
 
 /** Idiomas con textos de interfaz y ejemplos DEMO. Cada mitad muestra sus textos en el idioma de su persona. */
 export const UI_LANGUAGES = ["es", "en"] as const;
@@ -308,6 +309,50 @@ export function clipSummary(copy: Copy, durationMs: number, byteLength: number):
   const seconds = (durationMs / 1000).toFixed(1).replace(".", copy.local.decimal);
   return `${seconds} s · ${String(Math.max(1, Math.round(byteLength / 1024)))} KB`;
 }
+
+/** Textos de la sesión (web), en español como la cabecera y el pie. Nunca muestran códigos crudos del SDK. */
+export const AUTH: {
+  readonly title: string;
+  readonly intro: string;
+  readonly google: string;
+  readonly demo: string;
+  readonly retry: string;
+  readonly note: string;
+  readonly checking: string;
+  readonly signingIn: string;
+  readonly signingOut: string;
+  readonly failure: string;
+  readonly signIn: string;
+  readonly signInFull: string;
+  readonly signOut: string;
+  readonly accountFallback: string;
+  readonly errors: Readonly<Record<AuthErrorCode, string>>;
+} = {
+  title: "Traduce cara a cara",
+  intro: "Inicia sesión con Google o prueba la demo local en este dispositivo.",
+  google: "Continuar con Google",
+  demo: "Probar demo local",
+  retry: "Reintentar",
+  note: "La demo local no necesita cuenta. Iniciar sesión todavía no activa la traducción real.",
+  checking: "Comprobando sesión…",
+  signingIn: "Abriendo Google…",
+  signingOut: "Cerrando sesión…",
+  failure: "No se pudo comprobar la sesión. Reintenta o prueba la demo local.",
+  signIn: "Iniciar sesión",
+  signInFull: "Iniciar sesión con Google",
+  signOut: "Cerrar sesión",
+  accountFallback: "Cuenta de Google",
+  errors: {
+    POPUP_BLOCKED: "El navegador bloqueó la ventana de Google. Permite las ventanas emergentes y vuelve a intentarlo.",
+    NETWORK: "Sin conexión con Google. Revisa tu red y vuelve a intentarlo.",
+    CONFIG: "El inicio de sesión no está disponible en este sitio ahora. Puedes probar la demo local.",
+    RATE_LIMITED: "Demasiados intentos. Espera un momento y vuelve a intentarlo.",
+    ACCOUNT_DISABLED: "Esta cuenta de Google no puede iniciar sesión en Dialon.",
+    BROWSER: "Este navegador no permite iniciar sesión aquí. Prueba otro navegador o la demo local.",
+    UNKNOWN: "No se pudo iniciar sesión. Vuelve a intentarlo.",
+    SIGN_OUT_FAILED: "No se pudo cerrar sesión. Vuelve a intentarlo.",
+  },
+};
 
 export function isUiLanguage(code: string): code is UiLanguage {
   return UI_LANGUAGES.some((language) => language === code);

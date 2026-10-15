@@ -1,7 +1,8 @@
 # Prueba de la DEMO en Cloudflare Pages
 
 Esta carpeta publica la app real de `apps/mobile`, exportada por Expo/Metro. No usa `.tools/qa-web`.
-La escucha, traducción y voz siguen simuladas; los avisos DEMO permanecen visibles.
+En web se graba y reproduce audio local real; la traducción sigue pendiente. Google usa Firebase Authentication,
+y la demo local funciona sin cuenta. En nativo la escucha, traducción y voz siguen simuladas.
 
 ## Runtime y build
 
@@ -14,7 +15,7 @@ La escucha, traducción y voz siguen simuladas; los avisos DEMO permanecen visib
 - Carpeta generada: **`apps/mobile/dist`** (`index.html`, `_expo/` y metadata de exportación).
 
 El script `scripts/build-web.mjs` ejecuta Expo offline, sin telemetry ni lectura de dotenv. Mantiene estado
-Expo y temporales en `.tools/`; no necesita cuentas ni secretos para esta DEMO. El bundle requiere JavaScript
+Expo y temporales en `.tools/`; no necesita cuentas ni secretos para compilar. El bundle requiere JavaScript
 y un origen seguro (HTTPS/localhost) para los UUID de `expo-crypto`.
 
 ## Parámetros para enlazar Pages
@@ -28,13 +29,16 @@ y un origen seguro (HTTPS/localhost) para los UUID de `expo-crypto`.
 | `NODE_VERSION` | `24.16.0` |
 | `PNPM_VERSION` | `10.34.6` |
 
-Pages puede servir esta SPA desde `index.html`. No hay backend, Functions, variables de cuenta o claves que
-configurar para la DEMO. La carpeta dist es generada y está fuera de Git. El enlace con Cloudflare y su
+Pages puede servir esta SPA desde `index.html`. No hay backend, Functions ni variables que configurar. El bundle
+lleva la configuración **pública** de cliente de Firebase Authentication (`apiKey`, `authDomain`, `projectId`,
+`appId` en `apps/mobile/src/auth/firebaseConfig.ts`): no son secretos. `dialon.pages.dev` debe seguir en los dominios
+autorizados de Firebase Authentication para que el popup de Google funcione allí. La carpeta dist es generada y está fuera de Git. El enlace con Cloudflare y su
 despliegue los realiza Luis; esta tarea no crea ni modifica recursos de Cloudflare.
 
 ## Límites
 
-- No autentica con Google/Firebase ni graba o reproduce audio.
+- El inicio de sesión con Google (popup) no protege la demo local ni ningún backend: todavía no se envían ni verifican
+  tokens. No usar `signInWithRedirect` sin un proxy de `/__/auth` (el `authDomain` es otro sitio).
 - No ejecuta traducción ni inferencia real.
 - La comprobación en navegador no valida Android, TalkBack o APK.
 - Los avisos de dependencias y sus bloqueos están en `../verification/2026-10-13-auditoria-dependencias.md`.

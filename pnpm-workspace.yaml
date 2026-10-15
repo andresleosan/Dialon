@@ -8,3 +8,7 @@ cacheDir: .tools/.cache/pnpm
 
 # Solo versiones publicadas hace al menos 7 días: margen ante paquetes comprometidos recién publicados.
 minimumReleaseAge: 10080
+
+# Firebase instala Firestore aunque esta app solo usa Auth; fijar su gRPC corregido (GHSA-m9gg-hp2v-232j).
+overrides:
+  "@firebase/firestore>@grpc/grpc-js": 1.13.6

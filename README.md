@@ -4,8 +4,11 @@ Traductor cara a cara por turnos: dos personas comparten un teléfono y cada una
 
 Estado actual: **interfaz DEMO** en `apps/mobile` (Expo SDK 57). En web, «Hablar» graba audio local real del
 micrófono (getUserMedia + MediaRecorder) y se puede volver a escuchar; el audio no sale del dispositivo y no se
-traduce. En nativo la escucha, la traducción y la voz siguen simuladas. No usa red, cuentas ni servicios. La extensión
-de Chrome, el servidor y la inferencia real llegan en bloques posteriores.
+traduce. En web también hay inicio de sesión real con Google (Firebase Authentication, popup) y una demo local que
+no necesita cuenta; iniciar sesión todavía no activa traducción ni backend. En nativo la escucha, la traducción y la voz
+siguen simuladas y no hay inicio de sesión: Android con Google necesita su propio adaptador, app Android registrada y
+huellas SHA ([especificación](docs/superpowers/specs/2026-10-15-firebase-google-web.md)). La extensión de Chrome, el
+servidor y la inferencia real llegan en bloques posteriores.
 
 ## Estructura
 
@@ -57,5 +60,6 @@ Runtime: Node 24.16.0 y pnpm 10.34.6. Parámetros de Pages: [guía de despliegue
 - Pruebas automáticas: comandos de arriba.
 - QA actual de interfaz, selector y favicon: [`docs/verification/2026-10-14-ui-selector-favicon.md`](docs/verification/2026-10-14-ui-selector-favicon.md).
 - Auditoría de dependencias: [`docs/verification/2026-10-13-auditoria-dependencias.md`](docs/verification/2026-10-13-auditoria-dependencias.md).
-- Pendiente: Android real, TalkBack, APK, audio y traducción reales; comprobar en Android la letra grande, el teclado
+- Google Auth web: [implementación, 244 pruebas y QA de navegador](docs/verification/2026-10-15-google-auth-web.md). El inicio real con una cuenta de Google queda pendiente de validación manual en un origen autorizado.
+- Pendiente: Android real (también Google en Android), TalkBack, APK, audio y traducción reales; comprobar en Android la letra grande, el teclado
   nativo con el selector abierto (sobre todo el de B, girado) y que el foco vuelva al selector al cerrarlo.

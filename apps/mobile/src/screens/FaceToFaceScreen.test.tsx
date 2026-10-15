@@ -178,6 +178,64 @@ function expectFaceToFace() {
   expect(screen.getByTestId("mitad-B")).toHaveStyle({ flex: 1, ...ROTATED });
 }
 
+describe("FaceToFaceScreen: acción de sesión en la cabecera", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  async function renderWithSession(session: NonNullable<Parameters<typeof FaceToFaceScreen>[0]["session"]>) {
+    await render(
+      <SafeAreaProvider initialMetrics={METRICS}>
+        <FaceToFaceScreen createRequestId={uuidSequence()} session={session} />
+      </SafeAreaProvider>,
+    );
+  }
+
+  it("en el teléfono añade un botón de sesión ≥48 en la cabecera, fuera de las mitades, que siguen iguales y con B girada", async () => {
+    const onPress = jest.fn();
+    await renderWithSession({ label: "Cerrar sesión", accessibilityLabel: "Cerrar sesión, Ana", onPress });
+    const button = screen.getByRole("button", { name: "Cerrar sesión, Ana" });
+    expect(within(button).getByText("Cerrar sesión")).toBeOnTheScreen();
+    expect(within(screen.getByTestId("mitad-A")).queryByRole("button", { name: "Cerrar sesión, Ana" })).toBeNull();
+    expect(within(screen.getByTestId("mitad-B")).queryByRole("button", { name: "Cerrar sesión, Ana" })).toBeNull();
+    expect(button).toHaveStyle({ minHeight: 48 });
+    expect(screen.getByTestId("mitad-A")).toHaveStyle({ flex: 1 });
+    expect(screen.getByTestId("mitad-B")).toHaveStyle({ flex: 1, transform: [{ rotate: "180deg" }] });
+    expect(screen.queryByText("Ana")).toBeNull();
+    await fireEvent.press(button);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it("un aviso de sesión se anuncia como alerta en la cabecera del teléfono, sin cambiar las mitades", async () => {
+    await renderWithSession({
+      label: "Cerrar sesión",
+      accessibilityLabel: "Cerrar sesión, Ana",
+      onPress: jest.fn(),
+      notice: "No se pudo cerrar sesión. Vuelve a intentarlo.",
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cerrar sesión. Vuelve a intentarlo.");
+    expect(screen.getByTestId("mitad-B")).toHaveStyle({ flex: 1, transform: [{ rotate: "180deg" }] });
+  });
+
+  it("en escritorio muestra el nombre de la cuenta junto al botón, y el aviso", async () => {
+    jest.replaceProperty(Platform, "OS", "web");
+    setViewport(1440, 900);
+    const onPress = jest.fn();
+    await renderWithSession({
+      label: "Cerrar sesión",
+      accessibilityLabel: "Cerrar sesión, Ana",
+      accountName: "Ana",
+      onPress,
+      notice: "No se pudo cerrar sesión. Vuelve a intentarlo.",
+    });
+    expect(screen.getByText("Ana")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Cerrar sesión, Ana" }));
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cerrar sesión. Vuelve a intentarlo.");
+    expect(screen.getByTestId("conversacion")).toHaveStyle({ flexDirection: "row" });
+  });
+});
+
 describe("FaceToFaceScreen: disposición automática según el dispositivo", () => {
   const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
 

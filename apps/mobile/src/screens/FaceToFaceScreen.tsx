@@ -36,6 +36,20 @@ export interface FaceToFaceScreenProps {
   readonly createRequestId: () => string;
   /** Web: grabación y reproducción locales reales. Sin él (nativo), la conversación es la DEMO simulada. */
   readonly audio?: LocalAudio;
+  /** Acción de sesión en la cabecera (web): iniciar sesión como invitado o cerrarla. Sin ella, la cabecera no cambia. */
+  readonly session?: HeaderSession;
+}
+
+export interface HeaderSession {
+  /** Texto visible del botón, corto («Cerrar sesión», «Iniciar sesión»). */
+  readonly label: string;
+  /** Nombre accesible completo; contiene el texto visible. */
+  readonly accessibilityLabel: string;
+  /** Nombre de la cuenta, visible solo en escritorio (en el teléfono no cabe sin apretar la cabecera). */
+  readonly accountName?: string;
+  readonly onPress: () => void;
+  /** Aviso de sesión (p. ej. no se pudo cerrar), anunciado como alerta. */
+  readonly notice?: string;
 }
 
 /** Lado corto máximo de una pantalla táctil que, sin otra pista del navegador, se trata como teléfono. */
@@ -648,7 +662,21 @@ interface PickerState {
  * dos paneles derechos lado a lado (B a la izquierda) o, al elegir «Cara a cara», la vista del teléfono centrada.
  * A va siempre primero en el árbol accesible.
  */
-export function FaceToFaceScreen({ createRequestId, audio }: FaceToFaceScreenProps) {
+/** Botón de sesión de la cabecera: área táctil de 48 como mínimo. */
+function SessionButton({ session, compact }: { readonly session: HeaderSession; readonly compact: boolean }) {
+  return (
+    <Pressable
+      role="button"
+      aria-label={session.accessibilityLabel}
+      onPress={session.onPress}
+      style={({ pressed }) => [styles.sessionButton, compact && styles.sessionButtonCompact, pressed && styles.pressed]}
+    >
+      <Text style={[styles.sessionText, compact && styles.sessionTextCompact]}>{session.label}</Text>
+    </Pressable>
+  );
+}
+
+export function FaceToFaceScreen({ createRequestId, audio, session }: FaceToFaceScreenProps) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { state, languages, pairIssue, press, cancel, selectLanguage, clip, playback, play, stopPlayback, levels } =
@@ -735,11 +763,19 @@ export function FaceToFaceScreen({ createRequestId, audio }: FaceToFaceScreenPro
             ]}
           >
             <Brand size={22} fontSize={20} gap={7} />
-            <View style={[styles.row, styles.mobileMode]}>
-              <Icon name="phone" size={15} color={COLORS.cabeceraModo} />
-              <Text style={styles.mobileModeText}>{CHROME.faceToFaceHeader}</Text>
-            </View>
+            {/* Un aviso de sesión ocupa el hueco del modo: la cabecera no crece y las mitades no se encogen. */}
+            {session?.notice !== undefined ? (
+              <Text role="alert" numberOfLines={2} style={[styles.mobileModeText, styles.sessionNotice]}>
+                {session.notice}
+              </Text>
+            ) : (
+              <View style={[styles.row, styles.mobileMode]}>
+                <Icon name="phone" size={15} color={COLORS.cabeceraModo} />
+                <Text style={styles.mobileModeText}>{CHROME.faceToFaceHeader}</Text>
+              </View>
+            )}
             <Text style={styles.mobileDemo}>{CHROME.demo}</Text>
+            {session && <SessionButton session={session} compact />}
           </View>
           <View
             testID="conversacion"
@@ -769,10 +805,23 @@ export function FaceToFaceScreen({ createRequestId, audio }: FaceToFaceScreenPro
       >
         <View style={styles.header}>
           <Brand size={30} fontSize={28} gap={12} />
-          <View style={styles.pill}>
-            <Text style={styles.pillText}>{CHROME.demo}</Text>
+          <View style={[styles.row, styles.headerEnd]}>
+            <View style={styles.pill}>
+              <Text style={styles.pillText}>{CHROME.demo}</Text>
+            </View>
+            {session?.accountName !== undefined && (
+              <Text numberOfLines={1} style={styles.accountName}>
+                {session.accountName}
+              </Text>
+            )}
+            {session && <SessionButton session={session} compact={false} />}
           </View>
         </View>
+        {session?.notice !== undefined && (
+          <Text role="alert" style={styles.desktopNotice}>
+            {session.notice}
+          </Text>
+        )}
 
         <View style={styles.intro}>
           <View style={styles.shrink}>
@@ -848,6 +897,23 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.linea,
   },
   pill: { borderWidth: 1, borderColor: COLORS.pildora, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 12 },
+  headerEnd: { gap: 12, flexShrink: 1 },
+  accountName: { flexShrink: 1, maxWidth: 220, fontSize: 13, lineHeight: 16, fontWeight: "600", color: COLORS.tinta },
+  sessionButton: {
+    minHeight: 48,
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: COLORS.pildora,
+    backgroundColor: COLORS.blanco,
+    outlineColor: COLORS.marino,
+  },
+  sessionButtonCompact: { paddingHorizontal: 10 },
+  sessionText: { fontSize: 13, lineHeight: 16, fontWeight: "600", color: COLORS.tinta },
+  sessionTextCompact: { fontSize: 11, lineHeight: 14 },
+  sessionNotice: { flexShrink: 1, color: COLORS.tinta },
+  desktopNotice: { marginTop: 12, fontSize: 13, lineHeight: 18, fontWeight: "600", color: COLORS.tinta },
   pillText: { fontSize: 12, lineHeight: 14, fontWeight: "500", color: COLORS.apagado },
   intro: {
     marginTop: 36,
