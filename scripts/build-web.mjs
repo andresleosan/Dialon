@@ -30,7 +30,7 @@ for (const key of ["PATH", "Path", "SystemRoot", "SYSTEMROOT", "ComSpec", "COMSP
 
 
 // Única variable pública admitida: enlaza la web con el Worker sin heredar secretos del entorno.
-const publicApiUrl = process.env.EXPO_PUBLIC_DIALON_API_URL?.trim();
+const publicApiUrl = process.env.EXPO_PUBLIC_DIALON_API_URL?.trim() ?? "https://dialon-api.andres-san1404.workers.dev";
 if (publicApiUrl !== undefined && publicApiUrl !== "") {
   const url = new URL(publicApiUrl);
   if (url.protocol !== "https:" || url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "" || url.pathname !== "/") {

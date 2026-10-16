@@ -52,7 +52,7 @@ Documentación oficial: [exportación Expo](https://docs.expo.dev/guides/publish
 
 ## Publicación autorizada del panel (16 de octubre de 2026)
 
-La web del panel necesita EXPO_PUBLIC_DIALON_API_URL con el origen HTTPS real de dialon-api al ejecutar pnpm build:web. El script admite únicamente esa variable pública adicional y no hereda secretos. Sin ella el build conserva el modo sin panel de cuenta. Validar que la URL aparece en el bundle antes de desplegar apps/mobile/dist.
+El build web usa por defecto el origen público de producción https://dialon-api.andres-san1404.workers.dev, también en los builds automáticos de Pages. EXPO_PUBLIC_DIALON_API_URL permite sustituirlo por otro origen HTTPS validado; un valor vacío lo desactiva de forma explícita. El script admite únicamente esa variable pública adicional y no hereda secretos. Validar que la URL correcta aparece en el bundle antes de desplegar apps/mobile/dist.
 
 El Worker de apps/api usa la configuración principal, las migraciones D1 0001–0004 y el R2 privado ya preparado. El CORS de producción permite únicamente https://dialon.pages.dev; el origen de desarrollo queda en la configuración local. El propietario se comprueba por UID/correo/verificación del JWT. Las tarifas/solicitudes de pago permanecen deshabilitadas y sin catálogo; RECEIPT_PURGE_ENABLED sigue false y no hay cron.
 
