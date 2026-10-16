@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": []
+  },
+  // `Env` y los tipos del runtime los genera `node scripts/api-tool.mjs types` en .tools/ (fuera de Git).
+  "include": ["src", "../../.tools/api/worker-configuration.d.ts"]
+}

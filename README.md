@@ -7,8 +7,20 @@ micrófono (getUserMedia + MediaRecorder) y se puede volver a escuchar; el audio
 traduce. En web también hay inicio de sesión real con Google (Firebase Authentication, popup) y una demo local que
 no necesita cuenta; iniciar sesión todavía no activa traducción ni backend. En nativo la escucha, la traducción y la voz
 siguen simuladas y no hay inicio de sesión: Android con Google necesita su propio adaptador, app Android registrada y
-huellas SHA ([especificación](docs/superpowers/specs/2026-10-15-firebase-google-web.md)). La extensión de Chrome, el
-servidor y la inferencia real llegan en bloques posteriores.
+huellas SHA ([especificación](docs/superpowers/specs/2026-10-15-firebase-google-web.md)). La extensión de Chrome y la
+inferencia real llegan en bloques posteriores.
+
+API de traducción de **texto** (`apps/api`, Cloudflare Worker) y su cliente (`packages/api-client`): implementados y
+probados en local contra Sarin y DeepSeek **simulados**, **sin desplegar** y sin traducción desde la app. Sarin real no está
+verificado (DNS y TLS responden y Cloudflare Access protege el endpoint; credenciales, modelo y calidad por confirmar) y no hay ASR: el audio que graba la app no
+se traduce ([especificación](docs/superpowers/specs/2026-10-15-sarin-text-translation.md),
+[verificación](docs/verification/2026-10-15-sarin-text-translation.md)).
+
+Administración manual y suscripción por transferencia con comprobante privado (spec
+[manual-admin](docs/superpowers/specs/2026-10-16-manual-admin.md)): Worker, cliente y paneles web «Administración» y
+«Mi suscripción» (`?panel=admin` / `?panel=subscription`) implementados **solo en local** con D1/R2 de Miniflare. Con el API configurado, «Mi suscripción» se abre desde la conversación; el enlace «Administración» exige el rol devuelto por el backend. Sin
+`EXPO_PUBLIC_DIALON_API_URL` (vacía por defecto) la app no llama al API. UID real del propietario verificado y recursos D1/R2 privados creados, con bindings preparados sin desplegar. Pendientes las migraciones remotas y una guarda de purga segura antes de publicar; la retención de 90 días está aprobada como diseño. DeepSeek solo con modelos permitidos; Gemini no se
+usa. [Verificación y límites de esta fase](docs/verification/2026-10-16-manual-admin.md).
 
 ## Estructura
 
@@ -17,6 +29,8 @@ servidor y la inferencia real llegan en bloques posteriores.
 | `packages/contracts` | Tipos, códigos de error, límites y validadores compartidos |
 | `packages/core` | Máquina de turnos (reductor puro) |
 | `apps/mobile` | App Expo: pantalla (`src/screens/FaceToFaceScreen.tsx`), selector de idioma (`LanguagePicker.tsx`), controlador DEMO, textos es/en, iconos y tema fijo |
+| `apps/api` | Worker sin desplegar: autenticación Firebase, suscripciones y cuotas, Sarin/DeepSeek elegidos por el propietario, solicitudes y comprobantes privados |
+| `packages/api-client` | Cliente del API (token inyectado, validación en ambos sentidos, sin reintentos). Requiere un `fetch` con `Response.body` legible (navegador, Node, Workers); sin stream, `INVALID_RESPONSE` |
 
 ## Ejecutar las comprobaciones
 
@@ -27,8 +41,10 @@ Desde `/root/Dialon`:
 # Solo la primera vez: pnpm local del proyecto
 npm install pnpm@10.34.6 --prefix .tools/pnpm --cache .tools/.cache/npm --ignore-scripts --registry=https://registry.npmjs.org/
 ./.tools/pnpm/node_modules/.bin/pnpm install --registry=https://registry.npmjs.org/
-./.tools/pnpm/node_modules/.bin/pnpm test       # Vitest (contracts, core) + Jest (pantalla)
-./.tools/pnpm/node_modules/.bin/pnpm typecheck  # TypeScript estricto en los tres paquetes
+./.tools/pnpm/node_modules/.bin/pnpm test       # Vitest (contracts, core, api-client, api) + Jest (pantalla)
+./.tools/pnpm/node_modules/.bin/pnpm test:api:integration  # Worker en workerd real (Miniflare), red simulada
+./.tools/pnpm/node_modules/.bin/pnpm typecheck  # Tipos del Worker (wrangler types, en .tools/) + TypeScript estricto
+./.tools/pnpm/node_modules/.bin/pnpm build:api  # Bundle del Worker con --dry-run (no despliega ni autentica)
 ./.tools/pnpm/node_modules/.bin/pnpm lint       # ESLint 10 + reglas de React Hooks
 ```
 

@@ -1,10 +1,10 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut, type Auth, type User } from "firebase/auth";
 import { FIREBASE_CONFIG } from "./firebaseConfig";
-import type { AuthErrorCode, AuthSessionProvider, AuthUser, SignInOutcome } from "./session";
+import type { AuthErrorCode, AuthSessionProvider, AuthUser, IdTokenSource, SignInOutcome } from "./session";
 
 // Solo Authentication: nada de Analytics, Firestore ni Storage. La sesión la guarda el SDK con su persistencia web
-// por defecto; aquí no se leen, devuelven, guardan ni registran tokens, credenciales ni correos.
+// por defecto. Solo getIdToken devuelve el ID token vigente para el API; no se guarda ni registra, ni se exponen correos.
 
 let auth: Auth | undefined;
 
@@ -55,7 +55,27 @@ function later(report: () => void) {
   void Promise.resolve().then(report);
 }
 
-export const firebaseAuth: AuthSessionProvider | undefined = {
+export const firebaseAuth: (AuthSessionProvider & IdTokenSource) | undefined = {
+  async getIdToken() {
+    let current: Auth;
+    try {
+      current = currentAuth();
+    } catch {
+      return null;
+    }
+    const user = current.currentUser;
+    if (!user) return null;
+    let token: string;
+    try {
+      token = await user.getIdToken();
+    } catch {
+      // El error del SDK puede llevar el correo: no sale de aquí.
+      return null;
+    }
+    // Si la cuenta cambió o se cerró mientras se pedía, ese token ya no es de quien está ahora.
+    return current.currentUser?.uid === user.uid ? token : null;
+  },
+
   subscribe(onUser, onError) {
     let current: Auth;
     try {

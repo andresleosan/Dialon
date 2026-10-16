@@ -35,3 +35,12 @@ export interface AuthSessionProvider {
   signInWithGoogle(): Promise<SignInOutcome>;
   signOut(): Promise<void>;
 }
+
+/**
+ * Fuente del Firebase ID token para llamadas protegidas al API (aún sin uso en la UI). Aparte de
+ * `AuthSessionProvider` para no cambiar la sesión ya aprobada.
+ */
+export interface IdTokenSource {
+  /** Token vigente de la cuenta actual, o `null` (sin cuenta, error o la cuenta cambió mientras se pedía). Nunca se guarda. */
+  getIdToken(): Promise<string | null>;
+}

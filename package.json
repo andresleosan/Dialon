@@ -4,10 +4,12 @@
   "type": "module",
   "packageManager": "pnpm@10.34.6",
   "scripts": {
-    "typecheck": "tsc -p packages/contracts && tsc -p packages/core && tsc -p apps/mobile",
+    "typecheck": "node scripts/api-tool.mjs types && tsc -p packages/contracts && tsc -p packages/core && tsc -p packages/api-client && tsc -p apps/api && tsc -p apps/mobile",
     "lint": "eslint .",
-    "test": "vitest run --dir packages && apps/mobile/node_modules/.bin/jest --config apps/mobile/package.json",
-    "build:web": "node scripts/build-web.mjs"
+    "test": "vitest run && apps/mobile/node_modules/.bin/jest --config apps/mobile/package.json",
+    "test:api:integration": "node scripts/api-tool.mjs integration",
+    "build:web": "node scripts/build-web.mjs",
+    "build:api": "node scripts/api-tool.mjs build"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

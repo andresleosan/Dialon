@@ -1,0 +1,14 @@
+{
+  "name": "@dialon/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@dialon/contracts": "workspace:*",
+    "jose": "6.2.12"
+  },
+  "devDependencies": {
+    "wrangler": "4.148.0",
+    "miniflare": "5.20261006.0-alpha"
+  }
+}

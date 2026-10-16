@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, URL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const app = join(root, "apps", "mobile");
@@ -28,9 +28,20 @@ for (const key of ["PATH", "Path", "SystemRoot", "SYSTEMROOT", "ComSpec", "COMSP
   if (process.env[key] !== undefined) env[key] = process.env[key];
 }
 
+
+// Única variable pública admitida: enlaza la web con el Worker sin heredar secretos del entorno.
+const publicApiUrl = process.env.EXPO_PUBLIC_DIALON_API_URL?.trim();
+if (publicApiUrl !== undefined && publicApiUrl !== "") {
+  const url = new URL(publicApiUrl);
+  if (url.protocol !== "https:" || url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "" || url.pathname !== "/") {
+    throw new Error("EXPO_PUBLIC_DIALON_API_URL debe ser un origen HTTPS público sin credenciales, ruta, parámetros ni fragmento.");
+  }
+  env.EXPO_PUBLIC_DIALON_API_URL = url.origin;
+}
+
 const result = spawnSync(
   process.execPath,
-  [join(app, "node_modules", "expo", "bin", "cli"), "export", "--platform", "web", "--output-dir", "dist"],
+  [join(app, "node_modules", "expo", "bin", "cli"), "export", "--clear", "--platform", "web", "--output-dir", "dist"],
   { cwd: app, env, stdio: "inherit" },
 );
 if (result.error) process.stderr.write(`${result.error.message}\n`);

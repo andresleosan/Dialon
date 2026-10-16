@@ -16,6 +16,18 @@ export const SERVER_ERROR_CODES = [
   "SERVICE_UNAVAILABLE",
   "TIMEOUT",
   "INTERNAL",
+  /** Sin suscripción activa y vigente: no hay traducción. */
+  "SUBSCRIPTION_REQUIRED",
+  /** Cuota del periodo de la suscripción agotada (no es un límite diario ni global). */
+  "QUOTA_EXCEEDED",
+  /** El proveedor activo es externo y la petición no trae `externalProcessingConsent: true`. */
+  "CONSENT_REQUIRED",
+  /** Estado incompatible: solicitud ya decidida, otra pendiente, clave de idempotencia con otro contenido… */
+  "CONFLICT",
+  /** El propietario no ha activado ni configurado los pagos por transferencia. */
+  "PAYMENTS_DISABLED",
+  /** El comprobante pasó su retención (90 días desde la subida) o ya se borró. */
+  "RECEIPT_EXPIRED",
 ] as const;
 
 /** Códigos que solo genera el cliente: micrófono, red, respuesta inválida y voz del dispositivo. */

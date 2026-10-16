@@ -1,4 +1,4 @@
-import type { AuthErrorCode, AuthSessionProvider, AuthUser } from "./session";
+import type { AuthErrorCode, AuthSessionProvider, AuthUser, IdTokenSource } from "./session";
 
 // SDK de Firebase simulado en su frontera de módulo (`firebase/app`, `firebase/auth`): ninguna prueba contacta con
 // Firebase ni con Google. Los códigos `auth/...` son literales del SDK.
@@ -186,5 +186,67 @@ describe("firebaseAuth (web): Google", () => {
     expect(mockSdk.signOut).toHaveBeenCalledTimes(1);
     mockSdk.signOut.mockRejectedValueOnce(authError("auth/network-request-failed"));
     await expect(firebaseAuth.signOut()).rejects.toBeInstanceOf(Error);
+  });
+});
+
+describe("firebaseAuth (web): ID token para llamadas protegidas", () => {
+  interface FakeUser {
+    uid: string;
+    getIdToken: jest.Mock<Promise<string>, []>;
+  }
+
+  function tokenSource() {
+    const loaded = jest.requireActual<{ firebaseAuth?: AuthSessionProvider & IdTokenSource }>("./firebaseAuth.web");
+    if (!loaded.firebaseAuth) throw new Error("sin proveedor");
+    return loaded.firebaseAuth;
+  }
+
+  function signedIn(user: FakeUser | null) {
+    const auth: { currentUser: FakeUser | null } = { currentUser: user };
+    mockSdk.getAuth.mockReturnValueOnce(auth as never);
+    return auth;
+  }
+
+  function fakeUser(uid: string, token: Promise<string>): FakeUser {
+    return { uid, getIdToken: jest.fn(() => token) };
+  }
+
+  it("sin cuenta devuelve null; con cuenta devuelve el token que da el SDK", async () => {
+    signedIn(null);
+    await expect(tokenSource().getIdToken()).resolves.toBeNull();
+    jest.resetModules();
+    const ana = fakeUser("uid-ana", Promise.resolve("token-ana"));
+    signedIn(ana);
+    await expect(tokenSource().getIdToken()).resolves.toBe("token-ana");
+    expect(ana.getIdToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("si la cuenta cambia o se cierra mientras se pide el token, devuelve null y no el token de la cuenta anterior", async () => {
+    let resolveToken!: (token: string) => void;
+    const ana = fakeUser("uid-ana", new Promise<string>((resolve) => (resolveToken = resolve)));
+    const auth = signedIn(ana);
+    const pending = tokenSource().getIdToken();
+    auth.currentUser = fakeUser("uid-bruno", Promise.resolve("token-bruno"));
+    resolveToken("token-ana");
+    await expect(pending).resolves.toBeNull();
+
+    jest.resetModules();
+    let resolveSecond!: (token: string) => void;
+    const again = fakeUser("uid-ana", new Promise<string>((resolve) => (resolveSecond = resolve)));
+    const second = signedIn(again);
+    const signingOut = tokenSource().getIdToken();
+    second.currentUser = null;
+    resolveSecond("token-ana");
+    await expect(signingOut).resolves.toBeNull();
+  });
+
+  it("un error del SDK o de la inicialización devuelve null sin lanzar ni filtrar el error", async () => {
+    signedIn({ uid: "uid-ana", getIdToken: jest.fn(() => Promise.reject(new Error("auth/network-request-failed ana@example.com"))) });
+    await expect(tokenSource().getIdToken()).resolves.toBeNull();
+    jest.resetModules();
+    mockSdk.initializeApp.mockImplementationOnce(() => {
+      throw new Error("invalid-api-key");
+    });
+    await expect(tokenSource().getIdToken()).resolves.toBeNull();
   });
 });

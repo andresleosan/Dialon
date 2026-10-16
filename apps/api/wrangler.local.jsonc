@@ -1,0 +1,31 @@
+{
+  // SOLO LOCAL (`wrangler dev --local --config wrangler.local.jsonc`, sin cuenta). D1 y R2 en el disco local de
+  // Miniflare. NO desplegar con este archivo: el nombre no es el del Worker real, no hay `account_id` y el
+  // `database_id` es un marcador inválido a propósito para que ningún deploy pueda enlazar ni provisionar recursos.
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "dialon-api-local-only",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:8081",
+    "OWNER_EMAIL": "andres.san1404@gmail.com",
+    // Vacío también en local: para probar el rol, pon un uid FICTICIO solo en tu sesión local, nunca aquí.
+    "OWNER_FIREBASE_UID": "",
+    "DEEPSEEK_MODEL": "deepseek-flash",
+    // Purga de comprobantes apagada también en local; solo los fixtures de prueba la activan con "true".
+    "RECEIPT_PURGE_ENABLED": "false"
+  },
+  "ratelimits": [{ "name": "TRANSLATE_LIMITER", "namespace_id": "4100", "simple": { "limit": 10, "period": 60 } }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dialon-local-only",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "PROOFS", "bucket_name": "dialon-proofs-local-only" }]
+}

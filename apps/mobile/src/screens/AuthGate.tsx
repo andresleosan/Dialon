@@ -1,4 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
+import { Button as AccountButton } from "../account/ui";
+import { AccountScreen } from "../account/AccountScreen";
+import type { ApiClient } from "../account/api";
+import { panelRoute as defaultPanelRoute, type PanelName, type PanelRoute } from "../account/panelRoute";
 import type { LocalAudio } from "../audio/capture";
 import type { AuthSessionProvider } from "../auth/session";
 import { useAuthSession } from "../auth/useAuthSession";
@@ -11,28 +16,67 @@ export interface AuthGateProps {
   readonly provider: AuthSessionProvider | undefined;
   readonly createRequestId: () => string;
   readonly audio?: LocalAudio;
+  /** Cliente del API; sin él (sin URL configurada, por defecto) no hay ninguna petición al servidor. */
+  readonly api?: ApiClient;
+  /** Panel de cuenta en la URL (`?panel=`); en nativo no hay. Inyectable para pruebas. */
+  readonly panelRoute?: PanelRoute;
 }
 
-type ConversationProps = Omit<AuthGateProps, "provider">;
+type ConversationProps = Omit<AuthGateProps, "provider" | "api" | "panelRoute">;
 
 /**
  * Entrada de la app. Nativo: la DEMO tal cual. Web: pantalla inicial con Google o demo local sin cuenta. La
  * conversación se monta con `key = uid` (otra cuenta, conversación nueva) y está desmontada mientras se abre Google
  * o se cierra sesión: su limpieza al desmontar suelta micrófono, medidor, reproducción y clip.
  */
-export function AuthGate({ provider, ...conversation }: AuthGateProps) {
+export function AuthGate({ provider, api, panelRoute = defaultPanelRoute, ...conversation }: AuthGateProps) {
   if (!provider) return <FaceToFaceScreen {...conversation} />;
-  return <SessionGate provider={provider} {...conversation} />;
+  return <SessionGate provider={provider} api={api} panelRoute={panelRoute} {...conversation} />;
 }
 
-function SessionGate({ provider, createRequestId, audio }: ConversationProps & { readonly provider: AuthSessionProvider }) {
+interface SessionGateProps extends ConversationProps {
+  readonly provider: AuthSessionProvider;
+  readonly api: ApiClient | undefined;
+  readonly panelRoute: PanelRoute;
+}
+
+function SessionGate({ provider, api, panelRoute, createRequestId, audio }: SessionGateProps) {
   const session = useAuthSession(provider);
   const [guest, setGuest] = useState(false);
+  const [panel, setPanel] = useState<PanelName | undefined>(() => panelRoute.read());
   const { user, busy, error, failure } = session;
+
+  useEffect(() => panelRoute.subscribe(setPanel), [panelRoute]);
+
+  if (busy === undefined && user && panel !== undefined) {
+    const name = user.name ?? AUTH.accountFallback;
+    // Paneles de cuenta solo con sesión; quién es propietario lo decide el backend dentro de la pantalla.
+    return (
+      <AccountScreen
+        key={user.uid}
+        api={api}
+        panel={panel}
+        createId={createRequestId}
+        notice={error && AUTH.errors[error]}
+        onNavigate={(next) => {
+          panelRoute.write(next);
+          setPanel(next);
+        }}
+        signOut={{
+          label: AUTH.signOut,
+          accessibilityLabel: `${AUTH.signOut}, ${name}`,
+          onPress: () => {
+            setGuest(false);
+            session.signOut();
+          },
+        }}
+      />
+    );
+  }
 
   if (busy === undefined && user) {
     const name = user.name ?? AUTH.accountFallback;
-    return (
+    const conversation = (
       <FaceToFaceScreen
         key={user.uid}
         createRequestId={createRequestId}
@@ -48,6 +92,21 @@ function SessionGate({ provider, createRequestId, audio }: ConversationProps & {
           },
         }}
       />
+    );
+    if (!api) return conversation;
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 8, alignItems: "flex-end" }}>
+          <AccountButton
+            label="Mi suscripción"
+            onPress={() => {
+              panelRoute.write("subscription");
+              setPanel("subscription");
+            }}
+          />
+        </View>
+        {conversation}
+      </View>
     );
   }
 

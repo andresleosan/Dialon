@@ -1,0 +1,50 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "dialon-api",
+  "account_id": "05fb22c155667de064b55c4e287b21d8",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-06",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    }
+  },
+  "vars": {
+    "ALLOWED_ORIGINS": "https://dialon.pages.dev",
+    "OWNER_EMAIL": "andres.san1404@gmail.com",
+    "OWNER_FIREBASE_UID": "57bGIuBCzKNFqjP8XrkP0T7jJP82",
+    "DEEPSEEK_MODEL": "deepseek-flash",
+    "RECEIPT_PURGE_ENABLED": "false"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dialon-db",
+      "database_id": "214e3bbd-541d-4acc-a3e2-bed6247876f6",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PROOFS",
+      "bucket_name": "dialon-proofs"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "TRANSLATE_LIMITER",
+      "namespace_id": "4100",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    }
+  ]
+}

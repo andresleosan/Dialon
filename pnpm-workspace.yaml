@@ -12,3 +12,5 @@ minimumReleaseAge: 10080
 # Firebase instala Firestore aunque esta app solo usa Auth; fijar su gRPC corregido (GHSA-m9gg-hp2v-232j).
 overrides:
   "@firebase/firestore>@grpc/grpc-js": 1.13.6
+  # Local Worker tooling: patched librsvg dependency (GHSA-wq5f-xc86-pv6w).
+  "miniflare>sharp": 0.35.5
